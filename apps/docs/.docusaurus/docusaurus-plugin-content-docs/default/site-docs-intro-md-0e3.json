@@ -1,0 +1,22 @@
+{
+  "id": "intro",
+  "title": "Giới thiệu",
+  "description": "React Native Iconify cung cấp trải nghiệm biểu tượng thống nhất giữa iOS, Android và Web dựa trên hệ sinh thái Iconify.",
+  "source": "@site/docs/intro.md",
+  "sourceDirName": ".",
+  "slug": "/intro",
+  "permalink": "/intro",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/react-native-iconify/react-native-iconify/tree/main/apps/docs/docs/intro.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "title": "Giới thiệu"
+  },
+  "sidebar": "guide",
+  "next": {
+    "title": "React Native CLI",
+    "permalink": "/getting-started/react-native"
+  }
+}

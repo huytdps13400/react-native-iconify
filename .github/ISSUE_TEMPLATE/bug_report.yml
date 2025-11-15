@@ -1,0 +1,50 @@
+name: Bug report
+description: Báo cáo sự cố khi sử dụng react-native-iconify
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cảm ơn bạn đã dành thời gian báo cáo lỗi! Vui lòng cung cấp thông tin chi tiết để chúng tôi tái hiện vấn đề.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Mô tả ngắn gọn
+      placeholder: Khi sử dụng Iconify với icon lucide:activity trên Android, app crash...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Các bước tái hiện
+      description: Nếu có thể, hãy đính kèm snippet hoặc link repo demo.
+      placeholder: |
+        1. Cấu hình Metro như ...
+        2. Chạy yarn iconify:generate
+        3. Mở app trên Android 14
+        4. Crash
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Môi trường
+      description: |
+        Liệt kê các phiên bản liên quan (React Native, Expo, react-native-svg, react-native-iconify, hệ điều hành).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / Stack trace
+      render: shell
+*** End Patch***
+

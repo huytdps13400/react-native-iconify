@@ -1,0 +1,26 @@
+{
+  "id": "optimization/bundle-size",
+  "title": "Tối ưu bundle size",
+  "description": "Chiến lược chính",
+  "source": "@site/docs/optimization/bundle-size.md",
+  "sourceDirName": "optimization",
+  "slug": "/optimization/bundle-size",
+  "permalink": "/optimization/bundle-size",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/react-native-iconify/react-native-iconify/tree/main/apps/docs/docs/optimization/bundle-size.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "title": "Tối ưu bundle size"
+  },
+  "sidebar": "guide",
+  "previous": {
+    "title": "Icon tuỳ chỉnh",
+    "permalink": "/configuration/custom-icons"
+  },
+  "next": {
+    "title": "Tích hợp CI/CD",
+    "permalink": "/optimization/ci"
+  }
+}

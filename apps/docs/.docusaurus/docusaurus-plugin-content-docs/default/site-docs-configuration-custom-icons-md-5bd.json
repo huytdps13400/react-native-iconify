@@ -1,0 +1,26 @@
+{
+  "id": "configuration/custom-icons",
+  "title": "Icon tuỳ chỉnh",
+  "description": "Bạn có thể bổ sung icon ngoài Iconify thông qua customCollections.",
+  "source": "@site/docs/configuration/custom-icons.md",
+  "sourceDirName": "configuration",
+  "slug": "/configuration/custom-icons",
+  "permalink": "/configuration/custom-icons",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/react-native-iconify/react-native-iconify/tree/main/apps/docs/docs/configuration/custom-icons.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "title": "Icon tuỳ chỉnh"
+  },
+  "sidebar": "guide",
+  "previous": {
+    "title": "Babel Transform",
+    "permalink": "/configuration/babel-plugin"
+  },
+  "next": {
+    "title": "Tối ưu bundle size",
+    "permalink": "/optimization/bundle-size"
+  }
+}

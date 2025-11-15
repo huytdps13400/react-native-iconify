@@ -1,0 +1,9 @@
+node_modules
+.turbo
+dist
+lib
+.DS_Store
+.iconify/*
+!.iconify/.gitkeep
+apps/*/build
+
