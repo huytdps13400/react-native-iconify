@@ -1,9 +1,0 @@
-{
-  "platforms": ["ios", "android"],
-  "ios": {
-    "modules": ["TurboCacheModule"]
-  },
-  "android": {
-    "modules": ["com.reactnativeiconify.turbocache.TurboCacheModule"]
-  }
-}

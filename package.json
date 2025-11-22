@@ -1,31 +1,66 @@
 {
   "name": "react-native-iconify",
-  "private": true,
-  "version": "0.0.0",
-  "packageManager": "yarn@1.22.22",
-  "scripts": {
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "dev": "turbo run dev --parallel",
-    "changeset": "changeset",
-    "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish"
-  },
-  "workspaces": [
-    "packages/*",
-    "apps/*"
+  "version": "1.0.0",
+  "description": "Load Iconify icons dynamically with native caching for React Native",
+  "main": "src/index.tsx",
+  "types": "src/index.tsx",
+  "react-native": "src/index.tsx",
+  "source": "src/index.tsx",
+  "files": [
+    "src",
+    "ios",
+    "android",
+    "scripts",
+    "*.podspec",
+    "react-native.config.js"
   ],
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "postinstall": "node scripts/postinstall.js",
+    "bundle": "node scripts/bundle-production.js",
+    "bundle:force": "node scripts/bundle-production.js --force",
+    "scan": "node scripts/scan-icons.js",
+    "fetch": "node scripts/fetch-icons.js",
+    "clear-cache": "node scripts/fetch-icons.js clear"
+  },
+  "keywords": [
+    "react-native",
+    "iconify",
+    "icons",
+    "svg",
+    "native",
+    "cache"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huykhuong/react-native-iconify.git"
+  },
+  "author": "Huy Khuong",
+  "license": "MIT",
+  "homepage": "https://github.com/huykhuong/react-native-iconify#readme",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "react-native-svg": ">=13.0.0"
+  },
   "devDependencies": {
-    "@changesets/cli": "^2.27.7",
-    "@types/node": "^20.16.5",
-    "@typescript-eslint/eslint-plugin": "^7.10.0",
-    "@typescript-eslint/parser": "^7.10.0",
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
-    "prettier": "^3.3.3",
-    "tsup": "^8.1.0",
-    "turbo": "^2.2.4",
-    "typescript": "^5.6.3"
+    "@react-native/babel-preset": "0.81.1",
+    "@types/react": "^19.1.0",
+    "@types/react-native": "^0.73.0",
+    "react": "19.1.0",
+    "react-native": "0.81.1",
+    "react-native-svg": "^15.8.0",
+    "typescript": "^5.4.5"
+  },
+  "codegenConfig": {
+    "name": "IconifySpec",
+    "type": "modules",
+    "jsSrcsDir": "src"
+  },
+  "create-react-native-library": {
+    "languages": "swift-kotlin",
+    "type": "turbo-module",
+    "version": "0.55.0"
   }
 }

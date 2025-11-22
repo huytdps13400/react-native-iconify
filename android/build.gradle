@@ -1,0 +1,166 @@
+buildscript {
+  ext.getExtOrDefault = {name ->
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['Iconify_' + name]
+  }
+
+  repositories {
+    google()
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath "com.android.tools.build:gradle:8.7.2"
+    // noinspection DifferentKotlinGradleVersion
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
+  }
+}
+
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+apply plugin: "com.facebook.react"
+
+def getExtOrIntegerDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Iconify_" + name]).toInteger()
+}
+
+android {
+  namespace "com.iconify"
+
+  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+  }
+
+  buildFeatures {
+    buildConfig true
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+    }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += [
+        "generated/java",
+        "generated/jni"
+      ]
+    }
+  }
+}
+
+repositories {
+  mavenCentral()
+  google()
+}
+
+def kotlin_version = getExtOrDefault("kotlinVersion")
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+
+  // Glide - Image caching library (like SDWebImage on iOS)
+  implementation "com.github.bumptech.glide:glide:4.16.0"
+  annotationProcessor "com.github.bumptech.glide:compiler:4.16.0"
+}
+
+// ============================================================================
+// Iconify Auto-Bundling for Production Builds
+// ============================================================================
+// This hook automatically bundles icons before release builds.
+// Icons are scanned from the app's codebase and bundled into the library.
+
+def isReleaseBuild = gradle.startParameter.taskNames.any { task ->
+  task.toLowerCase().contains('release') ||
+  task.toLowerCase().contains('assemble') ||
+  task.toLowerCase().contains('bundle')
+}
+
+// Only run bundling for release builds
+if (isReleaseBuild) {
+  afterEvaluate {
+    // Find the bundling script
+    def scriptPath = null
+    def possiblePaths = [
+      // In library's scripts folder
+      "${projectDir}/../scripts/bundle-production.js",
+      // In node_modules (when installed as dependency)
+      "${rootProject.projectDir}/../node_modules/react-native-iconify/scripts/bundle-production.js",
+      "${rootProject.projectDir}/node_modules/react-native-iconify/scripts/bundle-production.js",
+    ]
+
+    for (path in possiblePaths) {
+      def file = new File(path)
+      if (file.exists()) {
+        scriptPath = file.absolutePath
+        break
+      }
+    }
+
+    if (scriptPath != null) {
+      // Create bundling task
+      task bundleIconifyIcons {
+        description = 'Bundle Iconify icons for production build'
+
+        doLast {
+          println ''
+          println '🎨 [Iconify] Bundling icons for production build...'
+          println ''
+
+          try {
+            // Get the app's root directory (parent of android folder)
+            def appDir = rootProject.projectDir.parentFile ?: rootProject.projectDir
+            println "[Iconify] Scanning from: ${appDir}"
+
+            def result = exec {
+              commandLine 'node', scriptPath
+              workingDir appDir
+              ignoreExitValue = true
+            }
+
+            if (result.exitValue == 0) {
+              println ''
+              println '✅ [Iconify] Icon bundling complete!'
+              println ''
+            } else {
+              println ''
+              println '⚠️ [Iconify] Icon bundling failed (exit code: ' + result.exitValue + ')'
+              println '   Icons will be loaded from API at runtime.'
+              println ''
+            }
+          } catch (Exception e) {
+            println ''
+            println '⚠️ [Iconify] Icon bundling failed: ' + e.message
+            println '   Icons will be loaded from API at runtime.'
+            println ''
+          }
+        }
+      }
+
+      // Hook into preBuild task
+      tasks.matching { it.name == 'preBuild' }.configureEach { task ->
+        task.dependsOn bundleIconifyIcons
+      }
+
+      logger.lifecycle('[Iconify] Auto-bundling enabled for release build')
+    } else {
+      logger.warn('[Iconify] Could not find bundling script. Icons will be loaded from API.')
+    }
+  }
+}

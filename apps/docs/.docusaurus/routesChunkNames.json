@@ -1,101 +1,58 @@
 {
-  "/__docusaurus/debug-5ff": {
-    "__comp": "__comp---theme-debug-config-23-a-2ff",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    }
-  },
-  "/__docusaurus/debug/config-5ba": {
-    "__comp": "__comp---theme-debug-config-23-a-2ff",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    }
-  },
-  "/__docusaurus/debug/content-a2b": {
-    "__comp": "__comp---theme-debug-contentba-8-ce7",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    },
-    "__props": "__props---docusaurus-debug-content-3-c-0-be2"
-  },
-  "/__docusaurus/debug/globalData-c3c": {
-    "__comp": "__comp---theme-debug-global-dataede-0fa",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    }
-  },
-  "/__docusaurus/debug/metadata-156": {
-    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    }
-  },
-  "/__docusaurus/debug/registry-88c": {
-    "__comp": "__comp---theme-debug-registry-679-501",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    }
-  },
-  "/__docusaurus/debug/routes-000": {
-    "__comp": "__comp---theme-debug-routes-946-699",
-    "__context": {
-      "plugin": "plugin---docusaurus-debugb-38-ad3"
-    }
-  },
   "/-e5f": {
-    "__comp": "__comp---site-src-pages-index-tsx-1-df-d3e",
+    "__comp": "1df93b7f",
     "__context": {
-      "plugin": "plugin---a-74-9d6"
+      "plugin": "a7456010"
     },
-    "config": "config---5-e-9-4f3"
+    "config": "5e9f5e1a"
   },
   "/-212": {
-    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
+    "__comp": "5e95c892",
     "__context": {
-      "plugin": "plugin---aba-d70"
+      "plugin": "aba21aa0"
     }
   },
   "/-368": {
-    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
-    "__props": "__props---22-d-307"
+    "__comp": "a7bd4aaa",
+    "__props": "22dd74f7"
   },
   "/-8d1": {
-    "__comp": "__comp---theme-doc-roota-94-67a"
+    "__comp": "a94703ab"
   },
   "/configuration/babel-plugin-540": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---configuration-babel-plugin-1-af-3c9"
+    "__comp": "17896441",
+    "content": "1af44128"
   },
   "/configuration/custom-icons-2d0": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---configuration-custom-icons-5-bd-1a4"
+    "__comp": "17896441",
+    "content": "5bd802e9"
   },
   "/configuration/metro-2c6": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---configuration-metrob-54-f61"
+    "__comp": "17896441",
+    "content": "b54e8a71"
   },
   "/getting-started/expo-81a": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---getting-started-expo-885-a39"
+    "__comp": "17896441",
+    "content": "885ada48"
   },
   "/getting-started/react-native-76d": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---getting-started-react-nativec-21-471"
+    "__comp": "17896441",
+    "content": "c217fe78"
   },
   "/intro-fb3": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---intro-0-e-3-7b8"
+    "__comp": "17896441",
+    "content": "0e384e19"
   },
   "/optimization/bundle-size-3c3": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---optimization-bundle-sizef-28-1ba"
+    "__comp": "17896441",
+    "content": "f288fde6"
   },
   "/optimization/ci-14c": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---optimization-cic-9-f-546"
+    "__comp": "17896441",
+    "content": "c9fa9aaa"
   },
   "/troubleshooting/common-issues-fc6": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---troubleshooting-common-issues-513-bbf"
+    "__comp": "17896441",
+    "content": "5133d60e"
   }
 }

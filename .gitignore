@@ -1,9 +1,36 @@
-node_modules
-.turbo
-dist
-lib
-.DS_Store
-.iconify/*
-!.iconify/.gitkeep
-apps/*/build
+# Dependencies
+node_modules/
 
+# Build outputs
+lib/
+dist/
+build/
+
+# Iconify generated files
+.iconify-cache/
+src/bundled-icons.generated.ts
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.expo/
+.expo-shared/
