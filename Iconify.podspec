@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.source_files = "ios/**/*.{h,m,mm}"
 
   s.dependency "React-Core"
-  s.dependency "SDWebImage", "~> 5.21.0"
+  s.dependency "SDWebImage", "~> 5.10"
 
   # Support both architectures
   if ENV['RCT_NEW_ARCH_ENABLED'] == '1'

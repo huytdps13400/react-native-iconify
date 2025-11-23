@@ -1,6 +1,6 @@
 {
   "name": "@huymobile/react-native-iconify",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "200,000+ icons for React Native with native caching and zero configuration",
   "main": "lib/index.js",
   "module": "lib/index.js",
@@ -41,13 +41,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nicepkg/react-native-iconify.git"
+    "url": "https://github.com/huytdps13400/react-native-iconify.git"
   },
-  "author": "nicepkg",
+  "author": "huymobile",
   "license": "MIT",
-  "homepage": "https://github.com/nicepkg/react-native-iconify#readme",
+  "homepage": "https://github.com/huytdps13400/react-native-iconify#readme",
   "bugs": {
-    "url": "https://github.com/nicepkg/react-native-iconify/issues"
+    "url": "https://github.com/huytdps13400/react-native-iconify/issues"
   },
   "peerDependencies": {
     "react": ">=17.0.0",
