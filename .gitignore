@@ -6,13 +6,14 @@ lib/
 dist/
 build/
 
-# Iconify generated files
+# Iconify generated files (created during dev/build)
 .iconify-cache/
 src/bundled-icons.generated.ts
 
 # IDE
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
@@ -31,6 +32,18 @@ yarn-error.log*
 coverage/
 .nyc_output/
 
-# Misc
+# React Native
+*.xcworkspace
+*.xcuserdata
+Pods/
+Podfile.lock
+build/
+.gradle/
+local.properties
+
+# Expo
 .expo/
 .expo-shared/
+
+# Example apps (not for npm)
+apps/

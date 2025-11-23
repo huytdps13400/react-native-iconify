@@ -19,7 +19,8 @@ buildscript {
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
-apply plugin: "com.facebook.react"
+// Note: Not applying "com.facebook.react" plugin as this library doesn't use codegen
+// This prevents duplicate class issues in monorepo setups
 
 def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Iconify_" + name]).toInteger()
@@ -101,8 +102,8 @@ if (isReleaseBuild) {
       // In library's scripts folder
       "${projectDir}/../scripts/bundle-production.js",
       // In node_modules (when installed as dependency)
-      "${rootProject.projectDir}/../node_modules/react-native-iconify/scripts/bundle-production.js",
-      "${rootProject.projectDir}/node_modules/react-native-iconify/scripts/bundle-production.js",
+      "${rootProject.projectDir}/../node_modules/@huymobile/react-native-iconify/scripts/bundle-production.js",
+      "${rootProject.projectDir}/node_modules/@huymobile/react-native-iconify/scripts/bundle-production.js",
     ]
 
     for (path in possiblePaths) {

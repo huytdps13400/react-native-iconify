@@ -28,7 +28,7 @@ function getOutputPath() {
   if (fs.existsSync(packageJsonPath)) {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
-    if (packageJson.name === 'react-native-iconify') {
+    if (packageJson.name === '@huymobile/react-native-iconify') {
       // Running from library directory
       return path.join(cwd, 'src', 'bundled-icons.generated.ts');
     }
@@ -37,10 +37,10 @@ function getOutputPath() {
   // Running from user's app - check multiple possible locations
   const possiblePaths = [
     // Standard node_modules location
-    path.join(cwd, 'node_modules', 'react-native-iconify', 'src'),
+    path.join(cwd, 'node_modules', '@huymobile', 'react-native-iconify', 'src'),
     // Monorepo: check parent directories
-    path.join(cwd, '..', 'node_modules', 'react-native-iconify', 'src'),
-    path.join(cwd, '..', '..', 'node_modules', 'react-native-iconify', 'src'),
+    path.join(cwd, '..', 'node_modules', '@huymobile', 'react-native-iconify', 'src'),
+    path.join(cwd, '..', '..', 'node_modules', '@huymobile', 'react-native-iconify', 'src'),
     // Monorepo: library is sibling (e.g., apps/example-expo and root library)
     path.join(cwd, '..', '..', 'src'),
   ];
@@ -67,7 +67,7 @@ function getOutputPath() {
   }
 
   throw new Error(
-    '[Iconify] Could not find react-native-iconify source directory. ' +
+    '[Iconify] Could not find @huymobile/react-native-iconify source directory. ' +
     'Make sure the library is installed correctly.'
   );
 }

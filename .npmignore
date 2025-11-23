@@ -1,0 +1,42 @@
+# Example apps
+apps/
+
+# Build artifacts
+android/build/
+android/.gradle/
+ios/build/
+
+# Development files
+.git/
+.github/
+.claude/
+.cursor/
+.vscode/
+.idea/
+
+# Source code (publish compiled only)
+src/
+
+# Generated files
+.iconify-cache/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+**/__tests__/
+**/__mocks__/
+coverage/
+.nyc_output/
+
+# Config files not needed
+tsconfig.json
+.eslintrc*
+.prettierrc*

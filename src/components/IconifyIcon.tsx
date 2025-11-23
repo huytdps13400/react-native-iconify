@@ -6,22 +6,39 @@
  * Based on Iconify web component architecture
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, ActivityIndicator, type StyleProp, type ViewStyle } from 'react-native';
-import { SvgXml } from 'react-native-svg';
-import { loadIcon } from '../api';
-import { createCache, TurboCache } from '../cache';
-import type { IconifyIconProps, IconState } from './types';
-import type { IconData } from '../api/types';
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  View,
+  ActivityIndicator,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+// Lazy-load SvgXml to avoid Bridgeless mode initialization issues
+// import { SvgXml } from "react-native-svg";
+import { loadIcon } from "../api";
+import { createCache, TurboCache } from "../cache";
+import type { IconifyIconProps, IconState } from "./types";
+import type { IconData } from "../api/types";
+
+// Lazy-loaded SvgXml component
+let SvgXml: any = null;
+function getSvgXml() {
+  if (!SvgXml) {
+    SvgXml = require("react-native-svg").SvgXml;
+  }
+  return SvgXml;
+}
 
 // Import bundled icons (generated at build time for production)
 let BUNDLED_ICONS: Record<string, IconData> = {};
 try {
   // Try to import generated bundle (exists in production builds)
-  const bundled = require('../bundled-icons.generated');
+  const bundled = require("../bundled-icons.generated");
   BUNDLED_ICONS = bundled.BUNDLED_ICONS || {};
   if (__DEV__ && Object.keys(BUNDLED_ICONS).length > 0) {
-    console.log(`[Iconify] Loaded ${Object.keys(BUNDLED_ICONS).length} bundled icons`);
+    console.log(
+      `[Iconify] Loaded ${Object.keys(BUNDLED_ICONS).length} bundled icons`
+    );
   }
 } catch (err) {
   // Bundle not generated (development mode or first build)
@@ -36,7 +53,7 @@ function getCache(): TurboCache<IconData> {
   if (!cache) {
     cache = createCache<IconData>({
       maxSize: 1000,
-      defaultTTL: 24 * 60 * 60 * 1000 // 24 hours
+      defaultTTL: 24 * 60 * 60 * 1000, // 24 hours
     });
   }
   return cache;
@@ -112,17 +129,22 @@ export function IconifyIcon({
   onLoad,
   onError,
   fallback,
-  testID
+  testID,
 }: IconifyIconProps) {
   // Check bundled icons SYNCHRONOUSLY for instant rendering
   // This avoids the loading spinner flash for bundled icons
   const bundledIcon = BUNDLED_ICONS[name];
 
   // Use separate state variables instead of object to avoid Hermes freezing
-  // If icon is bundled, start with loading=false and iconData set
-  const [loading, setLoading] = useState(!bundledIcon);
+  // Start with loading=false to avoid flash - we only show loading on cache MISS
+  // For bundled icons, we have data immediately
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [iconData, setIconData] = useState<IconData | null>(bundledIcon || null);
+  const [iconData, setIconData] = useState<IconData | null>(
+    bundledIcon || null
+  );
+  // Track if we've checked cache yet (to show placeholder instead of nothing)
+  const [cacheChecked, setCacheChecked] = useState(!!bundledIcon);
 
   // Load icon data (only for non-bundled icons)
   useEffect(() => {
@@ -139,29 +161,45 @@ export function IconifyIcon({
 
     async function loadIconData() {
       try {
-        setLoading(true);
+        // Don't set loading=true yet - check cache first to avoid flash
         setError(null);
-        setIconData(null);
 
         const startTime = Date.now();
         const cacheKey = getCacheKey(name);
 
         // Priority 1: Try native cache (SDWebImage/Glide handles memory → disk)
+        // Check cache BEFORE showing loading indicator
         const cached = await getCache().get(cacheKey);
+
+        // Mark cache as checked (for render logic)
+        if (!cancelled) {
+          setCacheChecked(true);
+        }
+
         if (cached && !cancelled) {
           const loadTime = Date.now() - startTime;
-          console.log(`[IconifyIcon] ✅ Native cache HIT for "${name}" (${loadTime}ms)`);
+          console.log(
+            `[IconifyIcon] ✅ Native cache HIT for "${name}" (${loadTime}ms)`
+          );
           setLoading(false);
           setIconData(cached);
           onLoad?.();
           return;
         }
 
+        // Cache miss - NOW show loading indicator
+        if (!cancelled) {
+          setLoading(true);
+          setIconData(null);
+        }
+
         // Priority 2: Fetch from API
         console.log(`[IconifyIcon] 📡 Fetching "${name}" from API...`);
         const fetchedIconData: IconData = await loadIcon(name);
         const fetchTime = Date.now() - startTime;
-        console.log(`[IconifyIcon] ✅ Fetched "${name}" from API (${fetchTime}ms)`);
+        console.log(
+          `[IconifyIcon] ✅ Fetched "${name}" from API (${fetchTime}ms)`
+        );
 
         // Save to native cache
         await getCache().set(cacheKey, fetchedIconData);
@@ -174,8 +212,12 @@ export function IconifyIcon({
         }
       } catch (err) {
         if (!cancelled) {
-          const error = err instanceof Error ? err : new Error('Failed to load icon');
-          console.log(`[IconifyIcon] ❌ Error loading "${name}":`, error.message);
+          const error =
+            err instanceof Error ? err : new Error("Failed to load icon");
+          console.log(
+            `[IconifyIcon] ❌ Error loading "${name}":`,
+            error.message
+          );
           setLoading(false);
           setError(error);
           onError?.(error);
@@ -200,15 +242,15 @@ export function IconifyIcon({
   const transformStyle = useMemo(() => {
     const transforms: Transform[] = [];
 
-    if (flip === 'horizontal' || flip === 'both') {
+    if (flip === "horizontal" || flip === "both") {
       transforms.push({ scaleX: -1 });
     }
 
-    if (flip === 'vertical' || flip === 'both') {
+    if (flip === "vertical" || flip === "both") {
       transforms.push({ scaleY: -1 });
     }
 
-    if (typeof rotate === 'number' && rotate !== 0) {
+    if (typeof rotate === "number" && rotate !== 0) {
       transforms.push({ rotate: `${rotate}deg` });
     }
 
@@ -217,19 +259,42 @@ export function IconifyIcon({
 
   const mergedStyle = mergeStyles(style, transformStyle);
 
-  // Show fallback during loading
+  // While checking cache (before cache result), show placeholder to avoid layout shift
+  // This is different from loading - we only show ActivityIndicator on cache MISS
+  if (!cacheChecked && !iconData) {
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+    // Show empty placeholder with same dimensions (no spinner)
+    return (
+      <View
+        style={[{ width: size, height: size }, style]}
+        testID={testID ? `${testID}-checking` : undefined}
+      />
+    );
+  }
+
+  // Show fallback during loading (cache miss, fetching from API)
   if (loading && fallback) {
     return <>{fallback}</>;
   }
 
-  // Show default loading indicator
+  // Show loading indicator only on cache MISS (fetching from API)
   if (loading) {
     return (
       <View
-        style={[{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }, style]}
+        style={[
+          {
+            width: size,
+            height: size,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+          style,
+        ]}
         testID={testID ? `${testID}-loading` : undefined}
       >
-        <ActivityIndicator size="small" color={color || '#999'} />
+        <ActivityIndicator size="small" color={color || "#999"} />
       </View>
     );
   }
@@ -262,13 +327,16 @@ export function IconifyIcon({
     height: size,
   };
 
-  if (color && color !== 'currentColor') {
+  if (color && color !== "currentColor") {
     svgProps.color = color;
   }
 
+  // Get SvgXml component lazily to avoid Bridgeless mode issues
+  const SvgXmlComponent = getSvgXml();
+
   return (
     <View style={[{ width: size, height: size }, mergedStyle]} testID={testID}>
-      <SvgXml {...svgProps} />
+      <SvgXmlComponent {...svgProps} />
     </View>
   );
 }

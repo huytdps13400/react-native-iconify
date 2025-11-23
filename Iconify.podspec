@@ -55,9 +55,9 @@ echo ""
 # Find the bundling script
 SCRIPT_PATH=""
 POSSIBLE_PATHS=(
-  "${PODS_ROOT}/../node_modules/react-native-iconify/scripts/bundle-production.js"
-  "${SRCROOT}/../node_modules/react-native-iconify/scripts/bundle-production.js"
-  "${SRCROOT}/node_modules/react-native-iconify/scripts/bundle-production.js"
+  "${PODS_ROOT}/../node_modules/@huymobile/react-native-iconify/scripts/bundle-production.js"
+  "${SRCROOT}/../node_modules/@huymobile/react-native-iconify/scripts/bundle-production.js"
+  "${SRCROOT}/node_modules/@huymobile/react-native-iconify/scripts/bundle-production.js"
 )
 
 for path in "${POSSIBLE_PATHS[@]}"; do

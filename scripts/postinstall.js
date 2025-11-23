@@ -52,10 +52,10 @@ function setupGitignore() {
  */
 function showWelcome() {
   console.log('');
-  console.log('🎨 Thanks for installing react-native-iconify!');
+  console.log('🎨 Thanks for installing @huymobile/react-native-iconify!');
   console.log('');
   console.log('📚 Quick Start:');
-  console.log('  import { IconifyIcon } from \'react-native-iconify\';');
+  console.log('  import { IconifyIcon } from \'@huymobile/react-native-iconify\';');
   console.log('  <IconifyIcon name="mdi:home" size={24} />');
   console.log('');
   console.log('⚡ Auto-bundling: Icons are automatically bundled during');
@@ -73,7 +73,7 @@ function postinstall() {
   const packageJsonPath = path.join(process.cwd(), 'package.json');
   if (fs.existsSync(packageJsonPath)) {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-    if (packageJson.name === 'react-native-iconify') {
+    if (packageJson.name === '@huymobile/react-native-iconify') {
       // Installing in library itself, skip postinstall
       return;
     }

@@ -1,22 +1,21 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "ES2020",
     "module": "commonjs",
-    "lib": ["es2017", "es2019", "es2020"],
+    "lib": ["ES2020"],
     "jsx": "react-native",
-    "strict": false,
+    "strict": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "declaration": false,
-    "declarationMap": false,
-    "baseUrl": "./",
-    "paths": {
-      "react-native-iconify": ["./src/index.tsx"]
-    }
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "noEmit": false
   },
   "include": ["src/**/*"],
   "exclude": [
@@ -24,7 +23,7 @@
     "lib",
     "**/__tests__/**",
     "**/__mocks__/**",
-    "example",
-    "apps"
+    "apps",
+    "src/bundled-icons.generated.ts"
   ]
 }
