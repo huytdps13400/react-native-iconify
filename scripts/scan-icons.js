@@ -2,140 +2,12 @@
 /**
  * Icon Scanner
  *
- * Scans codebase for IconifyIcon usage and extracts all icon names.
- * Used during production builds to determine which icons to bundle.
+ * Scans codebase for IconifyIcon component usage and extracts icon names from the `name` prop.
+ * Only scans files that import IconifyIcon to ensure accuracy.
  */
 
 const fs = require("fs");
 const path = require("path");
-
-const VALID_ICONIFY_PREFIXES = [
-  "mdi",
-  "mdi-light",
-  "ic",
-  "ph",
-  "ri",
-  "carbon",
-  "tabler",
-  "lucide",
-  "heroicons",
-  "heroicons-outline",
-  "heroicons-solid",
-  "fa",
-  "fa-solid",
-  "fa-regular",
-  "fa-brands",
-  "fa6-solid",
-  "fa6-regular",
-  "fa6-brands",
-  "bi",
-  "bx",
-  "bxs",
-  "bxl",
-  "feather",
-  "ion",
-  "octicon",
-  "ant-design",
-  "simple-icons",
-  "logos",
-  "fluent",
-  "fluent-emoji",
-  "fluent-emoji-flat",
-  "fluent-emoji-high-contrast",
-  "twemoji",
-  "noto",
-  "noto-v1",
-  "emojione",
-  "emojione-v1",
-  "emojione-monotone",
-  "openmoji",
-  "fxemoji",
-  "clarity",
-  "akar-icons",
-  "uil",
-  "uiw",
-  "majesticons",
-  "zondicons",
-  "bytesize",
-  "ei",
-  "eva",
-  "prime",
-  "teenyicons",
-  "codicon",
-  "pepicons",
-  "pepicons-pop",
-  "pepicons-print",
-  "iconoir",
-  "iconamoon",
-  "basil",
-  "circum",
-  "pixelarticons",
-  "system-uicons",
-  "radix-icons",
-  "mingcute",
-  "solar",
-  "hugeicons",
-  "streamline",
-  "streamline-emojis",
-  "streamline-plump",
-  "eos-icons",
-  "material-symbols",
-  "material-symbols-light",
-  "ic-baseline",
-  "ic-outline",
-  "ic-round",
-  "ic-sharp",
-  "ic-twotone",
-  "jam",
-  "gridicons",
-  "mi",
-  "quill",
-  "gala",
-  "healthicons",
-  "medical-icon",
-  "covid",
-  "la",
-  "dashicons",
-  "flat-color-icons",
-  "entypo",
-  "entypo-social",
-  "foundation",
-  "raphael",
-  "icons8",
-  "wpf",
-  "iwwa",
-  "typcn",
-  "subway",
-  "icomoon-free",
-  "fontisto",
-  "ps",
-  "cil",
-  "gg",
-  "file-icons",
-  "vscode-icons",
-  "devicon",
-  "devicon-plain",
-  "skill-icons",
-  "catppuccin",
-  "line-md",
-  "svg-spinners",
-  "meteocons",
-  "token",
-  "token-branded",
-  "cryptocurrency",
-  "cryptocurrency-color",
-  "flag",
-  "flagpack",
-  "circle-flags",
-  "cif",
-  "gis",
-  "map",
-  "geo",
-  "game-icons",
-  "fad",
-  "academicons",
-  "guidance",
-];
 
 const CONFIG = {
   scanDirs: [
@@ -187,19 +59,21 @@ const CONFIG = {
     "ios",
     ".next",
     "out",
+    "bundled-icons.generated",
+  ],
+  componentNames: ["IconifyIcon"],
+  importSources: [
+    "@huymobile/react-native-iconify",
+    "react-native-iconify",
+    "../components/IconifyIcon",
+    "./IconifyIcon",
   ],
 };
 
-/**
- * Check if path should be ignored
- */
 function shouldIgnore(filePath) {
   return CONFIG.ignore.some((pattern) => filePath.includes(pattern));
 }
 
-/**
- * Recursively get all files in directory
- */
 function getAllFiles(dir, fileList = []) {
   if (!fs.existsSync(dir) || shouldIgnore(dir)) {
     return fileList;
@@ -226,71 +100,68 @@ function getAllFiles(dir, fileList = []) {
   return fileList;
 }
 
-/**
- * Check if icon prefix is a valid Iconify prefix
- */
-function isValidIconifyPrefix(prefix) {
-  return VALID_ICONIFY_PREFIXES.includes(prefix.toLowerCase());
-}
-
-/**
- * Validate if a string is a valid Iconify icon name
- * Valid format: prefix:icon-name where prefix is a known Iconify prefix
- */
-function isValidIconifyIcon(iconName) {
-  if (!iconName || typeof iconName !== "string") {
-    return false;
-  }
-
-  const parts = iconName.split(":");
-  if (parts.length !== 2) {
-    return false;
-  }
-
-  const [prefix, name] = parts;
-
-  if (!prefix || !name) {
-    return false;
-  }
-
-  if (!isValidIconifyPrefix(prefix)) {
-    return false;
-  }
-
-  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(name)) {
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Extract icon names from file content
- *
- * Matches patterns like:
- * - JSX props: name="mdi:home", name='mdi:home', name={"mdi:home"}, name={'mdi:home'}, name={`mdi:home`}
- * - Object properties: name: "mdi:home", name: 'mdi:home'
- * - Array/object values: ["mdi:home"], ['mdi:home']
- *
- * Only returns VALID Iconify icons (known prefixes)
- */
-function extractIconNames(content) {
-  const iconNames = new Set();
-
-  const patterns = [
-    /name=["']([a-z0-9-]+:[a-z0-9-]+)["']/gi,
-    /name=\{["']([a-z0-9-]+:[a-z0-9-]+)["']\}/gi,
-    /name=\{`([a-z0-9-]+:[a-z0-9-]+)`\}/gi,
-    /name:\s*["']([a-z0-9-]+:[a-z0-9-]+)["']/gi,
-    /["']([a-z0-9-]+:[a-z0-9-]+)["']/gi,
+function hasIconifyImport(content) {
+  const importPatterns = [
+    /import\s+.*IconifyIcon.*from\s+["']@huymobile\/react-native-iconify["']/,
+    /import\s+.*IconifyIcon.*from\s+["']react-native-iconify["']/,
+    /import\s+\{\s*IconifyIcon\s*\}\s*from/,
+    /require\s*\(\s*["']@huymobile\/react-native-iconify["']\s*\)/,
+    /require\s*\(\s*["']react-native-iconify["']\s*\)/,
   ];
 
-  patterns.forEach((pattern) => {
+  return importPatterns.some((pattern) => pattern.test(content));
+}
+
+function extractIconNamesFromComponent(content) {
+  const iconNames = new Set();
+
+  const componentPatterns = [
+    /<IconifyIcon[^>]*\sname\s*=\s*["']([^"']+)["'][^>]*\/?>/g,
+    /<IconifyIcon[^>]*\sname\s*=\s*\{["']([^"']+)["']\}[^>]*\/?>/g,
+    /<IconifyIcon[^>]*\sname\s*=\s*\{`([^`]+)`\}[^>]*\/?>/g,
+  ];
+
+  componentPatterns.forEach((pattern) => {
     let match;
     while ((match = pattern.exec(content)) !== null) {
-      const iconName = match[1].toLowerCase();
-      if (isValidIconifyIcon(iconName)) {
-        iconNames.add(iconName);
+      const iconName = match[1].trim();
+      if (iconName && iconName.includes(":") && !iconName.includes("${")) {
+        iconNames.add(iconName.toLowerCase());
+      }
+    }
+  });
+
+  const spreadPatterns = [
+    /IconifyIcon[^}]*name\s*:\s*["']([^"']+)["']/g,
+    /\{\s*name\s*:\s*["']([a-z0-9-]+:[a-z0-9-]+)["'][^}]*\}[^<]*<IconifyIcon/gi,
+  ];
+
+  spreadPatterns.forEach((pattern) => {
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      const iconName = match[1].trim();
+      if (iconName && iconName.includes(":") && !iconName.includes("${")) {
+        iconNames.add(iconName.toLowerCase());
+      }
+    }
+  });
+
+  const arrayPatterns = [
+    /const\s+\w*[Ii]cons?\w*\s*=\s*\[([^\]]+)\]/g,
+    /\w*[Ii]cons?\w*\s*:\s*\[([^\]]+)\]/g,
+  ];
+
+  arrayPatterns.forEach((pattern) => {
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      const arrayContent = match[1];
+      const stringPattern = /["']([a-z0-9-]+:[a-z0-9-]+)["']/gi;
+      let stringMatch;
+      while ((stringMatch = stringPattern.exec(arrayContent)) !== null) {
+        const iconName = stringMatch[1].trim();
+        if (iconName && iconName.includes(":")) {
+          iconNames.add(iconName.toLowerCase());
+        }
       }
     }
   });
@@ -298,24 +169,39 @@ function extractIconNames(content) {
   return Array.from(iconNames);
 }
 
-/**
- * Scan project and return all icon names
- */
+function extractIconNames(content) {
+  if (!hasIconifyImport(content)) {
+    return [];
+  }
+  return extractIconNamesFromComponent(content);
+}
+
 function scanProject(projectRoot = process.cwd()) {
   const allIcons = new Set();
   let filesScanned = 0;
   let filesWithIcons = 0;
+  let filesWithImport = 0;
 
-  console.log("🔍 [Iconify] Scanning for icon usage...\n");
+  console.log("🔍 [Iconify] Scanning for IconifyIcon component usage...\n");
 
   const scanFile = (file) => {
     filesScanned++;
     const content = fs.readFileSync(file, "utf-8");
-    const icons = extractIconNames(content);
+
+    if (!hasIconifyImport(content)) {
+      return;
+    }
+
+    filesWithImport++;
+    const icons = extractIconNamesFromComponent(content);
 
     if (icons.length > 0) {
       filesWithIcons++;
       icons.forEach((icon) => allIcons.add(icon));
+
+      const relativePath = path.relative(projectRoot, file);
+      console.log(`   📄 ${relativePath}: ${icons.length} icon(s)`);
+      icons.forEach((icon) => console.log(`      - ${icon}`));
     }
   };
 
@@ -358,9 +244,11 @@ function scanProject(projectRoot = process.cwd()) {
     byPrefix[prefix].push(icon);
   });
 
-  console.log(`   Scanned ${filesScanned} files`);
-  console.log(`   Found icons in ${filesWithIcons} files`);
-  console.log(`   Total unique icons: ${allIcons.size}\n`);
+  console.log(`\n   📊 Summary:`);
+  console.log(`   - Files scanned: ${filesScanned}`);
+  console.log(`   - Files with IconifyIcon import: ${filesWithImport}`);
+  console.log(`   - Files with icons: ${filesWithIcons}`);
+  console.log(`   - Total unique icons: ${allIcons.size}\n`);
 
   if (allIcons.size > 0) {
     console.log("   Icons by prefix:");
@@ -377,6 +265,7 @@ function scanProject(projectRoot = process.cwd()) {
     byPrefix,
     stats: {
       filesScanned,
+      filesWithImport,
       filesWithIcons,
       totalIcons: allIcons.size,
     },
@@ -386,27 +275,25 @@ function scanProject(projectRoot = process.cwd()) {
 module.exports = {
   scanProject,
   extractIconNames,
-  isValidIconifyIcon,
-  isValidIconifyPrefix,
-  VALID_ICONIFY_PREFIXES,
+  extractIconNamesFromComponent,
+  hasIconifyImport,
 };
 
 if (require.main === module) {
   const result = scanProject();
 
   if (result.icons.length === 0) {
-    console.log("⚠️  No icons found in codebase");
+    console.log("⚠️  No IconifyIcon components found in codebase\n");
+    console.log("   Make sure you:");
     console.log(
-      "   Make sure you are using IconifyIcon components with valid Iconify icon names\n"
+      '   1. Import IconifyIcon from "@huymobile/react-native-iconify"'
     );
+    console.log('   2. Use <IconifyIcon name="prefix:icon-name" /> in JSX\n');
+    console.log("   Example:");
     console.log(
-      "   Valid format: prefix:icon-name (e.g., mdi:home, fa:github)"
+      '     import { IconifyIcon } from "@huymobile/react-native-iconify";'
     );
-    console.log(
-      `   Supported prefixes: ${VALID_ICONIFY_PREFIXES.slice(0, 10).join(
-        ", "
-      )}, ...\n`
-    );
+    console.log('     <IconifyIcon name="mdi:home" size={24} />\n');
   } else {
     console.log("✅ Scan complete!\n");
   }
