@@ -1,6 +1,6 @@
 {
   "name": "@huymobile/react-native-iconify",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "200,000+ icons for React Native with native caching and zero configuration",
   "main": "lib/index.js",
   "module": "lib/index.js",
