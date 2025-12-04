@@ -199,9 +199,7 @@ export function IconifyIcon({
 
         if (cached && !cancelled) {
           const loadTime = Date.now() - startTime;
-          console.log(
-            `[IconifyIcon] ✅ Native cache HIT for "${name}" (${loadTime}ms)`
-          );
+
           setLoading(false);
           setIconData(cached);
           onLoad?.();
@@ -215,16 +213,11 @@ export function IconifyIcon({
         }
 
         // Priority 2: Fetch from API
-        console.log(`[IconifyIcon] 📡 Fetching "${name}" from API...`);
         const fetchedIconData: IconData = await loadIcon(name);
         const fetchTime = Date.now() - startTime;
-        console.log(
-          `[IconifyIcon] ✅ Fetched "${name}" from API (${fetchTime}ms)`
-        );
 
         // Save to native cache
         await getCache().set(cacheKey, fetchedIconData);
-        console.log(`[IconifyIcon] 💾 Cached "${name}" to native storage`);
 
         if (!cancelled) {
           setLoading(false);

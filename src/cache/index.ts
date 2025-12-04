@@ -7,15 +7,12 @@
  * Based on expo-image's caching architecture.
  */
 
-import { NativeDiskCache } from './native';
-import type { CacheOptions, NativeCacheModule } from './types';
+import { NativeDiskCache } from "./native";
+import type { CacheOptions, NativeCacheModule } from "./types";
 
-export { NativeDiskCache } from './native';
-export type {
-  CacheOptions,
-  NativeCacheModule
-} from './types';
-export { CacheError } from './types';
+export { NativeDiskCache } from "./native";
+export type { CacheOptions, NativeCacheModule } from "./types";
+export { CacheError } from "./types";
 
 /**
  * Native-only cache using SDWebImage (iOS) and Glide (Android).
@@ -27,10 +24,7 @@ export { CacheError } from './types';
 export class TurboCache<T = unknown> {
   private nativeCache: NativeDiskCache<T>;
 
-  constructor(
-    options: CacheOptions = {},
-    nativeModule?: NativeCacheModule
-  ) {
+  constructor(options: CacheOptions = {}, nativeModule?: NativeCacheModule) {
     this.nativeCache = new NativeDiskCache<T>(nativeModule);
   }
 
@@ -43,10 +37,8 @@ export class TurboCache<T = unknown> {
     try {
       const value = await this.nativeCache.get(key);
       if (value !== null) {
-        console.log(`[TurboCache] Native cache HIT for "${key}"`);
         return value;
       }
-      console.log(`[TurboCache] Native cache MISS for "${key}"`);
       return null;
     } catch (error) {
       console.error(`[TurboCache] Error getting from cache:`, error);
