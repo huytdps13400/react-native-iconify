@@ -14,8 +14,9 @@
     "*.podspec",
     "react-native.config.js"
   ],
+  "bundledIconsPath": "lib/bundled-icons.generated.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-bundled-icons.js",
     "clean": "rm -rf lib",
     "prepare": "npm run clean && npm run build",
     "prepublishOnly": "npm run prepare",

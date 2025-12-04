@@ -10,72 +10,121 @@
  * This script runs automatically during production builds.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { scanProject } = require('./scan-icons');
-const { fetchIcons } = require('./fetch-icons');
+const fs = require("fs");
+const path = require("path");
+const { scanProject } = require("./scan-icons");
+const { fetchIcons } = require("./fetch-icons");
 
 /**
  * Determine output file path
- * - If running from library itself: write to library's src/
- * - If running from user's app: write to node_modules/react-native-iconify/src/
+ * Priority:
+ * 1. library's src/ (development)
+ * 2. library's lib/ (production, after npm publish)
+ * 3. node_modules/.../lib/ (installed as dependency)
  */
 function getOutputPath() {
   const cwd = process.cwd();
-  const packageJsonPath = path.join(cwd, 'package.json');
+  const packageJsonPath = path.join(cwd, "package.json");
 
   // Check if we're running from within the library itself
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
 
-    if (packageJson.name === '@huymobile/react-native-iconify') {
-      // Running from library directory
-      return path.join(cwd, 'src', 'bundled-icons.generated.ts');
+    if (packageJson.name === "@huymobile/react-native-iconify") {
+      // Running from library directory (development)
+      // Write to src/ so it compiles to lib/ during tsc build
+      return path.join(cwd, "src", "bundled-icons.generated.ts");
     }
   }
 
   // Running from user's app - check multiple possible locations
   const possiblePaths = [
-    // Standard node_modules location
-    path.join(cwd, 'node_modules', '@huymobile', 'react-native-iconify', 'src'),
+    // Production: library compiled (lib/ has higher priority than src/)
+    path.join(cwd, "node_modules", "@huymobile", "react-native-iconify", "lib"),
+    // Development: library in node_modules with src/
+    path.join(cwd, "node_modules", "@huymobile", "react-native-iconify", "src"),
     // Monorepo: check parent directories
-    path.join(cwd, '..', 'node_modules', '@huymobile', 'react-native-iconify', 'src'),
-    path.join(cwd, '..', '..', 'node_modules', '@huymobile', 'react-native-iconify', 'src'),
+    path.join(
+      cwd,
+      "..",
+      "node_modules",
+      "@huymobile",
+      "react-native-iconify",
+      "lib"
+    ),
+    path.join(
+      cwd,
+      "..",
+      "node_modules",
+      "@huymobile",
+      "react-native-iconify",
+      "src"
+    ),
+    path.join(
+      cwd,
+      "..",
+      "..",
+      "node_modules",
+      "@huymobile",
+      "react-native-iconify",
+      "lib"
+    ),
+    path.join(
+      cwd,
+      "..",
+      "..",
+      "node_modules",
+      "@huymobile",
+      "react-native-iconify",
+      "src"
+    ),
     // Monorepo: library is sibling (e.g., apps/example-expo and root library)
-    path.join(cwd, '..', '..', 'src'),
+    path.join(cwd, "..", "..", "src"),
+    path.join(cwd, "..", "..", "lib"),
   ];
 
   for (const libPath of possiblePaths) {
     const resolvedPath = path.resolve(libPath);
-    // Check if this is the library's src folder (has index.ts or index.tsx)
+    // Check if this is the library's src/lib folder (has index.ts/js or index.tsx)
     if (fs.existsSync(resolvedPath)) {
-      const indexPath = path.join(resolvedPath, 'index.ts');
-      const indexTsxPath = path.join(resolvedPath, 'index.tsx');
-      if (fs.existsSync(indexPath) || fs.existsSync(indexTsxPath)) {
+      const indexPath = path.join(resolvedPath, "index.ts");
+      const indexJsPath = path.join(resolvedPath, "index.js");
+      const indexTsxPath = path.join(resolvedPath, "index.tsx");
+      if (
+        fs.existsSync(indexPath) ||
+        fs.existsSync(indexJsPath) ||
+        fs.existsSync(indexTsxPath)
+      ) {
         console.log(`[Iconify] Found library at: ${resolvedPath}`);
-        return path.join(resolvedPath, 'bundled-icons.generated.ts');
+        // For lib/ path, also output as .ts (will be treated as JSON by require)
+        const fileName =
+          path.basename(resolvedPath) === "lib"
+            ? "bundled-icons.generated.js"
+            : "bundled-icons.generated.ts";
+        return path.join(resolvedPath, fileName);
       }
     }
   }
 
   // Last resort: use script's own directory
   const scriptDir = path.dirname(__dirname);
-  const srcPath = path.join(scriptDir, 'src');
+  const srcPath = path.join(scriptDir, "src");
   if (fs.existsSync(srcPath)) {
     console.log(`[Iconify] Using script directory: ${srcPath}`);
-    return path.join(srcPath, 'bundled-icons.generated.ts');
+    return path.join(srcPath, "bundled-icons.generated.ts");
   }
 
   throw new Error(
-    '[Iconify] Could not find @huymobile/react-native-iconify source directory. ' +
-    'Make sure the library is installed correctly.'
+    "[Iconify] Could not find @huymobile/react-native-iconify source directory. " +
+      "Make sure the library is installed correctly."
   );
 }
 
 const OUTPUT_FILE = getOutputPath();
 
 /**
- * Generate TypeScript file with bundled icons
+ * Generate JavaScript file with bundled icons
+ * Output as CommonJS for compatibility with production builds
  */
 function generateBundleFile(iconsData) {
   const header = `/**
@@ -89,27 +138,27 @@ function generateBundleFile(iconsData) {
  * Total icons: ${Object.keys(iconsData).length}
  */
 
-import type { IconData } from './api/types';
-
 `;
 
   const iconEntries = Object.entries(iconsData)
     .map(([name, data]) => {
-      return `  '${name}': ${JSON.stringify(data, null, 4).replace(/\n/g, '\n  ')},`;
+      return `  '${name}': ${JSON.stringify(data, null, 4).replace(
+        /\n/g,
+        "\n  "
+      )},`;
     })
-    .join('\n');
+    .join("\n");
 
-  const exports = `
-export const BUNDLED_ICONS: Record<string, IconData> = {
+  const exports = `exports.BUNDLED_ICONS = {
 ${iconEntries}
 };
 
-export const isBundled = (name: string): boolean => {
-  return name in BUNDLED_ICONS;
+exports.isBundled = function(name) {
+  return name in exports.BUNDLED_ICONS;
 };
 
-export const getBundledIcon = (name: string): IconData | undefined => {
-  return BUNDLED_ICONS[name];
+exports.getBundledIcon = function(name) {
+  return exports.BUNDLED_ICONS[name];
 };
 `;
 
@@ -125,10 +174,10 @@ function getBundledIconNames(outputFile) {
   }
 
   try {
-    const content = fs.readFileSync(outputFile, 'utf-8');
+    const content = fs.readFileSync(outputFile, "utf-8");
     // Match icon names from BUNDLED_ICONS object
     const matches = content.matchAll(/'([a-z0-9-]+:[a-z0-9-]+)':/gi);
-    return Array.from(matches, m => m[1]);
+    return Array.from(matches, (m) => m[1]);
   } catch (err) {
     return [];
   }
@@ -138,12 +187,9 @@ function getBundledIconNames(outputFile) {
  * Main bundling function
  */
 async function bundleIcons(options = {}) {
-  const {
-    force = false,
-    outputFile = OUTPUT_FILE,
-  } = options;
+  const { force = false, outputFile = OUTPUT_FILE } = options;
 
-  console.log('🚀 [Iconify] Starting production icon bundling...\n');
+  console.log("🚀 [Iconify] Starting production icon bundling...\n");
 
   // Step 1: Scan codebase first (to compare with existing bundle)
   const scanResult = scanProject();
@@ -154,30 +200,37 @@ async function bundleIcons(options = {}) {
     const scannedIcons = scanResult.icons;
 
     // Find missing icons (in scanned but not in bundle)
-    const missingIcons = scannedIcons.filter(icon => !bundledIcons.includes(icon));
+    const missingIcons = scannedIcons.filter(
+      (icon) => !bundledIcons.includes(icon)
+    );
 
-    if (missingIcons.length === 0 && scannedIcons.length <= bundledIcons.length) {
+    if (
+      missingIcons.length === 0 &&
+      scannedIcons.length <= bundledIcons.length
+    ) {
       // All scanned icons are already bundled
-      console.log('✅ [Iconify] Bundle is up-to-date');
+      console.log("✅ [Iconify] Bundle is up-to-date");
       console.log(`   Bundled: ${bundledIcons.length} icons`);
       console.log(`   Scanned: ${scannedIcons.length} icons`);
-      console.log('   Use --force to regenerate\n');
+      console.log("   Use --force to regenerate\n");
       return;
     }
 
     if (missingIcons.length > 0) {
-      console.log(`🔄 [Iconify] Found ${missingIcons.length} new/missing icons:`);
-      missingIcons.slice(0, 5).forEach(icon => console.log(`   - ${icon}`));
+      console.log(
+        `🔄 [Iconify] Found ${missingIcons.length} new/missing icons:`
+      );
+      missingIcons.slice(0, 5).forEach((icon) => console.log(`   - ${icon}`));
       if (missingIcons.length > 5) {
         console.log(`   ... and ${missingIcons.length - 5} more`);
       }
-      console.log('');
+      console.log("");
     }
   }
 
   if (scanResult.icons.length === 0) {
-    console.log('⚠️  [Iconify] No icons found in codebase');
-    console.log('   Creating empty bundle...\n');
+    console.log("⚠️  [Iconify] No icons found in codebase");
+    console.log("   Creating empty bundle...\n");
 
     // Create empty bundle
     const emptyBundle = generateBundleFile({});
@@ -198,14 +251,16 @@ async function bundleIcons(options = {}) {
   const iconsData = await fetchIcons(scanResult.icons, {
     useCache: true,
     onProgress: ({ current, total, iconName }) => {
-      process.stdout.write(`\r   Progress: ${current}/${total} - ${iconName}                    `);
+      process.stdout.write(
+        `\r   Progress: ${current}/${total} - ${iconName}                    `
+      );
     },
   });
 
-  process.stdout.write('\r' + ' '.repeat(80) + '\r'); // Clear progress line
+  process.stdout.write("\r" + " ".repeat(80) + "\r"); // Clear progress line
 
   // Step 3: Generate bundle file
-  console.log('\n📝 [Iconify] Generating bundle file...');
+  console.log("\n📝 [Iconify] Generating bundle file...");
 
   const bundleContent = generateBundleFile(iconsData);
   const outputDir = path.dirname(outputFile);
@@ -227,16 +282,16 @@ async function bundleIcons(options = {}) {
 
   // Summary by prefix
   if (scanResult.byPrefix && Object.keys(scanResult.byPrefix).length > 0) {
-    console.log('   Icons by library:');
+    console.log("   Icons by library:");
     Object.entries(scanResult.byPrefix)
       .sort(([a], [b]) => a.localeCompare(b))
       .forEach(([prefix, icons]) => {
         console.log(`   - ${prefix}: ${icons.length} icons`);
       });
-    console.log('');
+    console.log("");
   }
 
-  console.log('🎉 [Iconify] Production bundling complete!\n');
+  console.log("🎉 [Iconify] Production bundling complete!\n");
 }
 
 // Export for programmatic use
@@ -248,14 +303,14 @@ module.exports = {
 // CLI usage
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const force = args.includes('--force') || args.includes('-f');
+  const force = args.includes("--force") || args.includes("-f");
 
   bundleIcons({ force })
     .then(() => {
       process.exit(0);
     })
     .catch((err) => {
-      console.error('\n❌ [Iconify] Bundling failed:', err.message);
+      console.error("\n❌ [Iconify] Bundling failed:", err.message);
       console.error(err.stack);
       process.exit(1);
     });

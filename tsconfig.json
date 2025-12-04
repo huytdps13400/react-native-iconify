@@ -17,7 +17,7 @@
     "rootDir": "./src",
     "noEmit": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "!src/bundled-icons.generated.ts"],
   "exclude": [
     "node_modules",
     "lib",

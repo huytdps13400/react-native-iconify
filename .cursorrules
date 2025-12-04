@@ -1,0 +1,309 @@
+# Cursor Rules for @huymobile/react-native-iconify
+
+## Project Overview
+@huymobile/react-native-iconify is a React Native icon library with 200,000+ icons, native caching via SDWebImage (iOS) and Glide (Android), and zero-configuration setup. It supports both Old and New Architecture (Bridgeless mode).
+
+**Key Stats**: v1.0.4, MIT License, TurboModule integration, production icon bundling
+
+---
+
+## Architecture Principles
+
+### 1. Icon Rendering Pipeline
+- **Bundled Icons** (production) → Instant render (0ms)
+- **Cache HIT** → No loading spinner
+- **Cache MISS** → Show spinner, fetch from API, cache result
+
+**Always check bundled icons FIRST**, then cache, then fetch.
+
+### 2. Native Caching Layer
+- **iOS**: SDWebImage (~5.10-5.21 compatible) for memory/disk caching
+- **Android**: Glide 4.16.0 for memory/disk caching
+- **JavaScript**: TurboModule bridge with retry logic
+
+**Cache is the performance foundation** - never bypass it.
+
+### 3. New Architecture Support (Bridgeless Mode)
+**Critical**: Lazy-load `react-native-svg` in IconifyIcon.tsx
+```typescript
+let SvgXml: any = null;
+function getSvgXml() {
+  if (!SvgXml) {
+    SvgXml = require("react-native-svg").SvgXml;
+  }
+  return SvgXml;
+}
+```
+Top-level imports cause PlatformConstants initialization errors in Bridgeless mode.
+
+---
+
+## Directory Structure & Responsibilities
+
+### `/src`
+**TypeScript source** - Single source of truth
+
+- `index.ts` - Main exports (IconifyIcon, cache APIs)
+- `components/IconifyIcon.tsx` - ⭐ CORE: Main component with rendering logic
+- `api/` - Iconify API interaction (fetch.ts, loader.ts with retry)
+- `cache/` - Cache abstraction (TurboCache, native bridge)
+- `specs/` - TurboModule specs (New Architecture)
+
+### `/lib`
+**Generated output** (tsc compilation) - Never edit manually
+- Git ignored, regenerated on `npm run prepare`
+
+### `/ios`
+**Native caching implementation**
+
+- `TurboCacheModule.m` - SDWebImage integration
+- `Iconify.podspec` - CocoaPods config + script phase for auto-bundling
+
+**Important**: SDWebImage dependency is relaxed (~5.10) for expo-image compatibility
+
+### `/android`
+**Native caching + build integration**
+
+- `TurboCacheModule.kt` - Glide integration
+- `build.gradle` - ⚠️ REMOVED `com.facebook.react` plugin (fixes duplicate class errors)
+
+### `/scripts`
+**Production workflows**
+
+- `bundle-production.js` - Scans icons → fetches → generates bundled-icons.generated.ts
+- `scan-icons.js` - Find all IconifyIcon usage in codebase
+- `postinstall.js` - Setup after npm install
+
+### `/apps/example-expo`
+**Monorepo testing app**
+
+- `metro.config.js` - ⚠️ CRITICAL: Forces app's React instance (fixes "Invalid hook" errors)
+- Expo New Architecture enabled for testing
+
+---
+
+## Critical Fixes & Constraints
+
+### 1. Bridgeless Mode (New Architecture iOS)
+**Issue**: PlatformConstants not initialized before react-native-svg import
+**Solution**: Lazy-load with `require()` in getSvgXml()
+**Rule**: NEVER import SvgXml at top-level
+
+### 2. Multiple React Instances
+**Issue**: Invalid hook calls when library uses React 18.2.0, app uses 19.1.0
+**Solution**: metro.config.js extraNodeModules + blockList
+**Rule**: Keep metro.config.js in sync with all node_modules React instances
+
+### 3. Android Duplicate Class
+**Issue**: `com.facebook.react` plugin generates duplicate RNGestureHandlerButtonManagerDelegate
+**Solution**: ✅ REMOVED from android/build.gradle
+**Rule**: Do NOT re-add `apply plugin: "com.facebook.react"`
+
+### 4. ActivityIndicator Flash
+**Issue**: Loading spinner flashes on cache HIT
+**Solution**: Check cache BEFORE setting loading state
+**Rule**: Use `cacheChecked` state to defer rendering spinner until actual miss
+
+### 5. SDWebImage Version Conflict
+**Issue**: expo-image requires ~5.19.1, old code required ~5.21.0
+**Solution**: Relaxed to ~5.10 in Ionify.podspec (compatible with 5.10-5.x)
+**Rule**: Keep dependency flexible for ecosystem compatibility
+
+---
+
+## Development Guidelines
+
+### When Adding Features
+1. ✅ Implement in `/src` (TypeScript)
+2. ✅ Update corresponding native module if cache/performance related
+3. ✅ Add tests in isolated test files
+4. ✅ Update example app if user-facing feature
+5. ✅ Document in README and inline JSDoc
+
+### When Modifying Components
+- **IconifyIcon.tsx**: Test both Old and New Architecture
+- **Cache**: Test on real device (not simulator)
+- **Native modules**: Test in example-expo with `newArchEnabled: true`
+
+### Code Standards
+- ✅ Lazy-load heavy imports (SVG rendering)
+- ✅ Keep component logic synchronized across iOS/Android
+- ✅ Error handling with fallback rendering
+- ✅ Memory leak prevention in useEffect cleanup
+- ✅ Type all external APIs with proper interfaces
+
+**Do NOT**:
+- ❌ Add top-level native imports (breaks Bridgeless mode)
+- ❌ Directly import React components at module scope if optional
+- ❌ Re-add Facebook React plugin to Android
+- ❌ Hardcode SDWebImage/Glide versions (breaks compatibility)
+- ❌ Skip cache checks for performance
+
+---
+
+## Building & Publishing
+
+### Local Development
+```bash
+npm run clean && npm run build    # Compile TypeScript
+npm run scan                       # Find all icons in codebase
+cd apps/example-expo && npm start  # Test in Expo
+```
+
+### Pre-Publication
+```bash
+npm run bundle                    # Bundle production icons
+npm run prepare                   # Clean + build (runs before publish)
+```
+
+### Version Bumps
+1. Update `package.json` version
+2. Run `npm run bundle:force` to refresh icon bundle
+3. Test in example-expo with new version
+4. Commit, tag, publish to npm
+
+---
+
+## Testing Checklist
+
+### Before Merging
+- [ ] Builds without errors: `npm run build`
+- [ ] Example app runs: `cd apps/example-expo && npm start`
+- [ ] No linter errors in modified files
+- [ ] Icon rendering tested (bundled, cached, fresh fetch)
+- [ ] New Architecture tested (iOS with Bridgeless)
+- [ ] Tested on Android (simulator + real device if possible)
+
+### Regression Testing
+- [ ] ActivityIndicator doesn't flash on cache HIT
+- [ ] Loading spinner shows on first load
+- [ ] Bundled icons load instantly
+- [ ] Cache persists across app restarts
+- [ ] Error fallback displays on network failure
+
+---
+
+## Key File Reference
+
+| File | Purpose | Edit Frequency |
+|------|---------|-----------------|
+| src/components/IconifyIcon.tsx | Main rendering component | Medium |
+| ios/TurboCacheModule.m | iOS SDWebImage cache | Low |
+| android/.../TurboCacheModule.kt | Android Glide cache | Low |
+| android/build.gradle | Gradle config | Low |
+| Iconify.podspec | iOS CocoaPods spec | Low |
+| scripts/bundle-production.js | Icon bundling | Medium |
+| apps/example-expo/metro.config.js | Monorepo Metro config | Very Low (critical) |
+| src/api/fetch.ts | Iconify API calls | Medium |
+| src/cache/cache.ts | Cache abstraction layer | Medium |
+
+---
+
+## Dependency Management
+
+### Fixed Dependencies (Do NOT change)
+- `react-native-svg` - Required for SVG rendering
+- `SDWebImage ~> 5.10` (iOS) - Cache implementation
+- `Glide 4.16.0` (Android) - Cache implementation
+
+### Peer Dependencies
+- `react` ≥ 18.2.0
+- `react-native` ≥ 0.65.0
+
+### Ecosystem Compatibility
+- ✅ Expo SDK 50+
+- ✅ expo-image (co-exists via relaxed SDWebImage)
+- ✅ New React Native Architecture
+- ✅ Monorepo setups (via metro.config.js)
+
+---
+
+## Common Tasks
+
+### Adding a New Icon API Source
+1. Create `src/api/new-source.ts` with fetch logic
+2. Add fallback to existing Iconify API fetch
+3. Update loader retry logic in `src/api/loader.ts`
+4. Test with IconifyIcon `onError` callback
+
+### Improving Cache Performance
+1. Modify `src/cache/cache.ts` (JavaScript layer)
+2. Update native modules (ios/Android) in sync
+3. Benchmark with example-expo profiler
+4. Test with large icon sets (500+ icons)
+
+### Debugging New Architecture Issues
+1. Check console for PlatformConstants errors
+2. Verify lazy-load pattern in getSvgXml()
+3. Check metro.config.js extraNodeModules
+4. Run: `cd apps/example-expo && npm start -- --reset-cache`
+
+---
+
+## Environment & Configuration
+
+### Build Environment
+- **TypeScript**: 5.0+
+- **Node**: 16+
+- **npm**: 8+
+- **iOS**: Xcode 14+, CocoaPods 1.12+
+- **Android**: Android SDK 21+, Gradle 8+
+
+### Production Icon Bundling
+- Automatic on iOS Release builds (Podspec script phase)
+- Automatic on Android release builds (build.gradle preBuild hook)
+- Manual: `npm run bundle`
+
+### Cache Configuration
+Default: 500 icons max, LRU eviction
+Custom: `createCache({ maxSize: 1000 })`
+
+---
+
+## Support & Documentation
+
+- **Main Component**: src/components/IconifyIcon.tsx
+- **API Docs**: In-file JSDoc comments
+- **Example Usage**: apps/example-expo/
+- **Native Implementation**: ios/TurboCacheModule.m, android/TurboCacheModule.kt
+- **Icon Database**: https://api.iconify.design
+
+---
+
+## Git & Version Control
+
+### Branch Protection
+- Main branch requires passing tests
+- No direct pushes to main
+
+### Commit Message Format
+```
+feat: Add icon rotation support
+fix: Prevent cache flash on load
+docs: Update README with new props
+chore: Bump dependencies
+```
+
+### File Exclusions
+- lib/ (generated)
+- bundled-icons.generated.ts (auto-generated)
+- node_modules/
+- .expo/
+
+---
+
+## Performance Targets
+
+- **Bundled icons**: < 10ms render time
+- **Cached icons**: < 50ms render time
+- **First fetch**: < 500ms (with Iconify API)
+- **Cache memory**: < 50MB for typical app
+- **Bundle size**: < 2MB even with 500 production icons
+
+---
+
+## Last Updated
+November 24, 2025
+
+For detailed context on architecture decisions, see the project README.md and ARCHITECTURE.md
+

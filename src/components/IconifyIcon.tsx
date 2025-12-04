@@ -30,20 +30,41 @@ function getSvgXml() {
 }
 
 // Import bundled icons (generated at build time for production)
+// Try multiple paths for compatibility with different build systems
 let BUNDLED_ICONS: Record<string, IconData> = {};
-try {
-  // Try to import generated bundle (exists in production builds)
-  const bundled = require("../bundled-icons.generated");
-  BUNDLED_ICONS = bundled.BUNDLED_ICONS || {};
-  if (__DEV__ && Object.keys(BUNDLED_ICONS).length > 0) {
-    console.log(
-      `[Iconify] Loaded ${Object.keys(BUNDLED_ICONS).length} bundled icons`
-    );
+function loadBundledIcons() {
+  const possiblePaths = [
+    // Path when running from source (development)
+    "../bundled-icons.generated",
+    // Path after tsc compilation (production, npm package in node_modules)
+    "../bundled-icons.generated.js",
+  ];
+
+  for (const modulePath of possiblePaths) {
+    try {
+      const bundled = require(modulePath);
+      const icons = bundled.BUNDLED_ICONS || bundled.default?.BUNDLED_ICONS;
+      if (icons && Object.keys(icons).length > 0) {
+        if (__DEV__) {
+          console.log(
+            `[Iconify] Loaded ${
+              Object.keys(icons).length
+            } bundled icons from ${modulePath}`
+          );
+        }
+        return icons;
+      }
+    } catch (err) {
+      // Try next path
+    }
   }
-} catch (err) {
-  // Bundle not generated (development mode or first build)
+
+  // Bundle not found (development or first build)
   // Icons will be fetched from API
+  return {};
 }
+
+BUNDLED_ICONS = loadBundledIcons();
 
 // Lazy cache initialization to avoid Hermes freezing during module loading
 // The cache is created on first use, not at module load time
