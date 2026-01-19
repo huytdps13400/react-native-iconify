@@ -115,10 +115,11 @@ if (isReleaseBuild) {
     }
 
     if (scriptPath != null) {
-      // Create bundling task
-      task bundleIconifyIcons {
+      // Use tasks.register for lazy task creation (recommended for newer Gradle)
+      // Register as a regular Task, not Exec, so we can handle errors gracefully
+      tasks.register('bundleIconifyIcons') {
         description = 'Bundle Iconify icons for production build'
-
+        
         doLast {
           println ''
           println '🎨 [Iconify] Bundling icons for production build...'
@@ -129,7 +130,8 @@ if (isReleaseBuild) {
             def appDir = rootProject.projectDir.parentFile ?: rootProject.projectDir
             println "[Iconify] Scanning from: ${appDir}"
 
-            def result = exec {
+            // Execute node command within doLast
+            def result = project.exec {
               commandLine 'node', scriptPath
               workingDir appDir
               ignoreExitValue = true
@@ -154,9 +156,9 @@ if (isReleaseBuild) {
         }
       }
 
-      // Hook into preBuild task
-      tasks.matching { it.name == 'preBuild' }.configureEach { task ->
-        task.dependsOn bundleIconifyIcons
+      // Hook into preBuild task using tasks.named (type-safe and efficient)
+      tasks.named('preBuild').configure {
+        dependsOn tasks.named('bundleIconifyIcons')
       }
 
       logger.lifecycle('[Iconify] Auto-bundling enabled for release build')

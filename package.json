@@ -25,7 +25,8 @@
     "bundle:force": "node scripts/bundle-production.js --force",
     "scan": "node scripts/scan-icons.js",
     "fetch": "node scripts/fetch-icons.js",
-    "clear-cache": "node scripts/fetch-icons.js clear"
+    "clear-cache": "node scripts/fetch-icons.js clear",
+    "publish": "node publish-commands.sh"
   },
   "keywords": [
     "react-native",

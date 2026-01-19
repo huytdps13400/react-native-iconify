@@ -30,37 +30,35 @@ function getSvgXml() {
 }
 
 // Import bundled icons (generated at build time for production)
-// Try multiple paths for compatibility with different build systems
+// Metro bundler requires static imports - we use a single require with try-catch
+// The path must be resolvable at build time (no dynamic string concatenation)
 let BUNDLED_ICONS: Record<string, IconData> = {};
-function loadBundledIcons() {
-  const possiblePaths = [
-    // Path when running from source (development)
-    "../bundled-icons.generated",
-    // Path after tsc compilation (production, npm package in node_modules)
-    "../bundled-icons.generated.js",
-  ];
 
-  for (const modulePath of possiblePaths) {
-    try {
-      const bundled = require(modulePath);
-      const icons = bundled.BUNDLED_ICONS || bundled.default?.BUNDLED_ICONS;
-      if (icons && Object.keys(icons).length > 0) {
-        if (__DEV__) {
-          console.log(
-            `[Iconify] Loaded ${
-              Object.keys(icons).length
-            } bundled icons from ${modulePath}`
-          );
-        }
-        return icons;
+function loadBundledIcons() {
+  try {
+    // Metro will resolve this to the correct file (.ts in dev, .js in compiled)
+    // This works because Metro/Node module resolution handles extension resolution
+    const bundled = require("../bundled-icons.generated");
+    const icons = bundled.BUNDLED_ICONS || bundled.default?.BUNDLED_ICONS;
+    
+    if (icons && Object.keys(icons).length > 0) {
+      if (__DEV__) {
+        console.log(
+          `[Iconify] Loaded ${Object.keys(icons).length} bundled icons`
+        );
       }
-    } catch (err) {
-      // Try next path
+      return icons;
+    }
+  } catch (err) {
+    // Bundle not found (development or first build)
+    // Icons will be fetched from API - this is expected behavior
+    if (__DEV__) {
+      console.log(
+        "[Iconify] No bundled icons found, will fetch from API"
+      );
     }
   }
-
-  // Bundle not found (development or first build)
-  // Icons will be fetched from API
+  
   return {};
 }
 
