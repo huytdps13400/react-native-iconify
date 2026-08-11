@@ -2,6 +2,8 @@ import type { IconData, IconifyAPIResponse } from './types';
 import { IconifyAPIError } from './types';
 import { fetchIconData } from './fetch';
 
+const DEFAULT_ICON_SIZE = 16;
+
 /**
  * Parse and validate icon data from API response
  * @param raw - Raw icon data
@@ -112,8 +114,8 @@ function extractIconFromResponse(
   const iconData = {
     name: iconName,
     body: rawIcon.body || '',
-    width: rawIcon.width ?? response.width ?? 0,
-    height: rawIcon.height ?? response.height ?? 0,
+    width: rawIcon.width ?? response.width ?? DEFAULT_ICON_SIZE,
+    height: rawIcon.height ?? response.height ?? DEFAULT_ICON_SIZE,
     left: rawIcon.left ?? response.left,
     top: rawIcon.top ?? response.top,
     rotate: rawIcon.rotate ?? response.rotate,
