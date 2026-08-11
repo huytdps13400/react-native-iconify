@@ -17,6 +17,10 @@
   "bundledIconsPath": "lib/bundled-icons.generated.js",
   "scripts": {
     "build": "tsc && node scripts/copy-bundled-icons.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:e2e",
+    "test:e2e": "npm run build && node --test test/e2e/*.test.js",
+    "ci": "npm run typecheck && npm run test:e2e",
     "clean": "rm -rf lib",
     "prepare": "npm run clean && npm run build",
     "prepublishOnly": "npm run prepare",
