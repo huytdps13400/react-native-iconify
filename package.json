@@ -1,11 +1,14 @@
 {
   "name": "@huymobile/react-native-iconify",
   "version": "1.0.9",
-  "description": "200,000+ icons for React Native with native caching and zero configuration",
+  "description": "200,000+ icons for React Native and Web with platform-aware caching",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
   "react-native": "lib/index.js",
+  "browser": {
+    "./lib/cache/native.js": "./lib/cache/native.web.js"
+  },
   "files": [
     "lib",
     "ios",
@@ -19,7 +22,10 @@
     "build": "tsc && node scripts/copy-bundled-icons.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:e2e",
-    "test:e2e": "npm run build && node --test test/e2e/*.test.js",
+    "test:e2e": "npm run build && npm run typecheck:web && npm run test:e2e:node && npm run test:e2e:web",
+    "typecheck:web": "tsc --noEmit -p test/e2e/web/tsconfig.json",
+    "test:e2e:node": "node --test test/e2e/*.test.js",
+    "test:e2e:web": "playwright test --config test/e2e/web/playwright.config.js",
     "ci": "npm run typecheck && npm run test:e2e",
     "clean": "rm -rf lib",
     "prepare": "npm run clean && npm run build",
@@ -34,6 +40,8 @@
   },
   "keywords": [
     "react-native",
+    "react-native-web",
+    "web",
     "iconify",
     "icons",
     "svg",
@@ -61,10 +69,15 @@
     "react-native-svg": ">=13.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.3.7",
     "react": "18.2.0",
+    "react-dom": "^18.2.0",
     "react-native": "0.73.0",
     "react-native-svg": "^15.0.0",
-    "typescript": "^5.4.5"
+    "react-native-web": "^0.19.13",
+    "typescript": "^5.4.5",
+    "vite": "^8.2.1"
   }
 }

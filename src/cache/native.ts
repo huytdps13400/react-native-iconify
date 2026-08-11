@@ -1,4 +1,4 @@
-import type { NativeCacheModule } from './types';
+import type { CacheOptions, NativeCacheModule } from './types';
 import { CacheError } from './types';
 import { NativeModules, Platform } from 'react-native';
 
@@ -54,7 +54,7 @@ function loadNativeModule(): NativeCacheModule {
 export class NativeDiskCache<T = unknown> {
   private nativeModule: NativeCacheModule;
 
-  constructor(nativeModule?: NativeCacheModule) {
+  constructor(nativeModule?: NativeCacheModule, _options: CacheOptions = {}) {
     this.nativeModule = nativeModule || loadNativeModule();
   }
 

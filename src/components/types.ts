@@ -1,4 +1,5 @@
 import type { StyleProp, ViewStyle } from 'react-native';
+import type { ReactNode } from 'react';
 import type { IconData } from '../api/types';
 
 export interface IconifyIconProps {
@@ -19,6 +20,15 @@ export interface IconifyIconProps {
 
   /** Callback when icon fails to load */
   onError?: (error: Error) => void;
+
+  /** Fallback rendered while loading or after an error */
+  fallback?: ReactNode;
+
+  /** Test identifier forwarded to the container */
+  testID?: string;
+
+  /** Flip the icon horizontally, vertically, or both */
+  flip?: 'horizontal' | 'vertical' | 'both';
 
   /** Horizontal flip */
   hFlip?: boolean;

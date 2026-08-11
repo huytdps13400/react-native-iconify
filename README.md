@@ -1,6 +1,6 @@
 # @huymobile/react-native-iconify
 
-> 200,000+ icons for React Native with native caching and zero configuration
+> 200,000+ icons for React Native and Web with platform-aware caching
 
 [![npm version](https://img.shields.io/npm/v/@huymobile/react-native-iconify)](https://www.npmjs.com/package/@huymobile/react-native-iconify)
 [![npm downloads](https://img.shields.io/npm/dm/@huymobile/react-native-iconify)](https://www.npmjs.com/package/@huymobile/react-native-iconify)
@@ -20,7 +20,7 @@ Traditional icon libraries require you to **bundle all icons** at build time, le
 - ✅ **Load icons by name** - no imports needed
 - ✅ **Zero bundle size impact** in development
 - ✅ **Automatic bundling** for production builds
-- ✅ **Native caching** with SDWebImage (iOS) and Glide (Android)
+- ✅ **Platform-aware caching** with SDWebImage (iOS), Glide (Android), and an in-memory web cache
 
 ---
 
@@ -36,6 +36,7 @@ Traditional icon libraries require you to **bundle all icons** at build time, le
 | 📱 **Old Architecture** | Backward compatible with React Native 0.60+ |
 | 🚀 **Expo Support** | Works with Expo development builds and EAS |
 | 🔧 **React Native CLI** | Full support for bare React Native projects |
+| 🌐 **Web Support** | Same component and import on React Native Web and Expo Web |
 
 ---
 
@@ -46,6 +47,7 @@ Traditional icon libraries require you to **bundle all icons** at build time, le
 | React Native | 0.68.0+ |
 | React Native (Old Arch) | 0.60.0+ |
 | Expo SDK | 49+ |
+| React Native Web | 0.19+ |
 | iOS | 13.0+ |
 | Android | API 21+ (Android 5.0) |
 
@@ -81,6 +83,9 @@ npx expo prebuild
 ```
 
 > **Note:** react-native-iconify requires a development build. It will not work with Expo Go.
+
+This native-build requirement applies to iOS and Android. Expo Web uses the
+JavaScript in-memory cache and does not load a native cache module.
 
 ---
 
@@ -241,6 +246,22 @@ eas build --platform all
 
 > ⚠️ **Not Supported**: react-native-iconify requires native modules and will not work with Expo Go. Use a development build instead.
 
+### Web
+
+React Native Web and Expo Web use the same component and import as iOS and
+Android—an app-level `.web.tsx` wrapper is not required:
+
+```tsx
+import { IconifyIcon } from '@huymobile/react-native-iconify';
+
+export function AppIcon() {
+  return <IconifyIcon name="mdi:web" size={32} color="#2563eb" />;
+}
+```
+
+Web caching is in memory and resets when the page reloads. iOS and Android
+continue to use their persistent native cache backends.
+
 ---
 
 ## Performance
@@ -249,6 +270,7 @@ eas build --platform all
 |----------|-----------|
 | Bundled icon (production) | **0ms** |
 | Native cache hit | **15-35ms** |
+| Web memory cache hit | **<1ms** |
 | API fetch (first load) | **200-500ms** |
 
 ---

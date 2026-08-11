@@ -186,7 +186,7 @@ export function IconifyIcon({
         const startTime = Date.now();
         const cacheKey = getCacheKey(name);
 
-        // Priority 1: Try native cache (SDWebImage/Glide handles memory → disk)
+        // Priority 1: Try the platform cache
         // Check cache BEFORE showing loading indicator
         const cached = await getCache().get(cacheKey);
 
@@ -214,7 +214,7 @@ export function IconifyIcon({
         const fetchedIconData: IconData = await loadIcon(name);
         const fetchTime = Date.now() - startTime;
 
-        // Save to native cache
+        // Save to the platform cache
         await getCache().set(cacheKey, fetchedIconData);
 
         if (!cancelled) {
