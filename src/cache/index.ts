@@ -1,8 +1,8 @@
 /**
  * @react-native-iconify/turbo-cache
  *
- * Native caching via SDWebImage (iOS) and Glide (Android).
- * Uses native memory + disk cache only (no JavaScript cache layer).
+ * Platform-aware caching via SDWebImage (iOS), Glide (Android), and an LRU
+ * memory cache on web.
  *
  * Based on expo-image's caching architecture.
  */
@@ -15,8 +15,8 @@ export type { CacheOptions, NativeCacheModule } from "./types";
 export { CacheError } from "./types";
 
 /**
- * Native-only cache using SDWebImage (iOS) and Glide (Android).
- * Both libraries provide built-in memory + disk caching with LRU eviction.
+ * Uses native memory + disk caching on iOS and Android, and a JavaScript LRU
+ * memory cache on web.
  *
  * This avoids Hermes "property is not writable" errors by eliminating
  * JavaScript object manipulation in the cache layer.
@@ -25,11 +25,11 @@ export class TurboCache<T = unknown> {
   private nativeCache: NativeDiskCache<T>;
 
   constructor(options: CacheOptions = {}, nativeModule?: NativeCacheModule) {
-    this.nativeCache = new NativeDiskCache<T>(nativeModule);
+    this.nativeCache = new NativeDiskCache<T>(nativeModule, options);
   }
 
   /**
-   * Get value from native cache (memory → disk handled by native layer)
+   * Get a value from the platform cache
    * @param key - Cache key
    * @returns Cached value or null
    */
@@ -47,7 +47,7 @@ export class TurboCache<T = unknown> {
   }
 
   /**
-   * Set value in native cache
+   * Set a value in the platform cache
    * @param key - Cache key
    * @param data - Data to cache
    * @param ttl - Time-to-live in milliseconds
@@ -55,7 +55,7 @@ export class TurboCache<T = unknown> {
   async set(key: string, data: T, ttl?: number): Promise<void> {
     try {
       await this.nativeCache.set(key, data, ttl);
-      console.log(`[TurboCache] Saved to native cache: "${key}"`);
+      console.log(`[TurboCache] Saved to cache: "${key}"`);
     } catch (error) {
       console.error(`[TurboCache] Error saving to cache:`, error);
       throw error;
@@ -102,7 +102,7 @@ export class TurboCache<T = unknown> {
 
 /**
  * Create a new TurboCache instance
- * @param options - Cache options (currently unused, for future extensibility)
+ * @param options - Cache size and expiration options
  * @param nativeModule - Optional native module (for testing)
  * @returns TurboCache instance
  */
