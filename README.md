@@ -177,6 +177,55 @@ Examples:
 
 ---
 
+## Production Bundling
+
+Release builds run `scripts/scan-icons.js` over your source tree and bundle every icon it
+finds, so those icons render instantly and work offline. You can run the same scan yourself:
+
+```bash
+node node_modules/@huymobile/react-native-iconify/scripts/scan-icons.js
+```
+
+### Wrapper components
+
+Icons are detected through your own wrapper components, not only through `IconifyIcon`
+directly. A component that renders `IconifyIcon` and forwards `name` is followed
+automatically, up to three levels deep:
+
+```tsx
+// components/AppIcon.tsx  - detected as a wrapper
+export default function AppIcon({ name, size = 24, ...rest }: AppIconProps) {
+  return <IconifyIcon name={name} size={size} {...rest} />;
+}
+
+// screens/HomeScreen.tsx  - "mdi:heart" is bundled
+<AppIcon name="mdi:heart" />
+```
+
+### Icon names the scanner cannot resolve
+
+Only literal names can be bundled. A name built at runtime — `name={iconName}`,
+`name={active ? 'mdi:check' : 'mdi:close'}` — is reported at the end of the scan with its
+file and line, and is fetched from the Iconify API at runtime instead.
+
+To bundle those icons, list them in your app's `package.json`:
+
+```json
+{
+  "iconify": {
+    "icons": ["mdi:check", "mdi:close"],
+    "components": ["LegacyIcon"]
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `icons` | Extra icon names to bundle, for names that cannot be resolved statically |
+| `components` | Extra component names to scan, for wrappers the scanner does not reach |
+
+---
+
 ## Icon Sets
 
 react-native-iconify supports **150+ icon sets** with over **200,000 icons**.

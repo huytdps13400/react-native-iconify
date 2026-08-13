@@ -3,7 +3,14 @@
  * Icon Scanner
  *
  * Scans codebase for IconifyIcon component usage and extracts icon names from the `name` prop.
- * Only scans files that import IconifyIcon to ensure accuracy.
+ *
+ * Apps commonly wrap IconifyIcon in their own component (`<AppIcon name="mdi:heart" />`).
+ * The scanner therefore runs in two phases:
+ *   1. Find local components that render IconifyIcon and forward the `name` prop.
+ *   2. Treat usages of those wrappers as icon usages too.
+ *
+ * Names that cannot be resolved statically (`name={variable}`) are reported so they can be
+ * declared explicitly via the `iconify` field in package.json.
  */
 
 const fs = require("fs");
@@ -68,6 +75,10 @@ const CONFIG = {
     "../components/IconifyIcon",
     "./IconifyIcon",
   ],
+  // How many levels of wrapper indirection to follow (a wrapper of a wrapper of ...).
+  maxWrapperDepth: 3,
+  // Maximum number of unresolved usages printed in the summary.
+  maxUnresolvedReported: 10,
 };
 
 function shouldIgnore(filePath) {
@@ -112,24 +123,344 @@ function hasIconifyImport(content) {
   return importPatterns.some((pattern) => pattern.test(content));
 }
 
-function extractIconNamesFromComponent(content) {
-  const iconNames = new Set();
+/**
+ * Find every opening JSX tag for `componentName` and return its attribute text.
+ * Tracks quotes and brace depth so props containing `>` (arrow functions),
+ * object/array literals and `{...spread}` do not truncate the tag.
+ */
+function findComponentTags(content, componentName) {
+  const tags = [];
+  const opening = `<${componentName}`;
+  let cursor = 0;
 
-  const componentPatterns = [
-    /<IconifyIcon[^>]*\sname\s*=\s*["']([^"']+)["'][^>]*\/?>/g,
-    /<IconifyIcon[^>]*\sname\s*=\s*\{["']([^"']+)["']\}[^>]*\/?>/g,
-    /<IconifyIcon[^>]*\sname\s*=\s*\{`([^`]+)`\}[^>]*\/?>/g,
-  ];
+  while (cursor < content.length) {
+    const start = content.indexOf(opening, cursor);
 
-  componentPatterns.forEach((pattern) => {
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
-      const iconName = match[1].trim();
-      if (iconName && iconName.includes(":") && !iconName.includes("${")) {
-        iconNames.add(iconName.toLowerCase());
+    if (start === -1) {
+      break;
+    }
+
+    const attrsStart = start + opening.length;
+    cursor = attrsStart;
+
+    // Avoid matching a longer component name (<IconifyIconGroup, <Icon.Base)
+    if (/[A-Za-z0-9_$.-]/.test(content[attrsStart] || "")) {
+      continue;
+    }
+
+    let depth = 0;
+    let quote = null;
+    let end = -1;
+
+    for (let i = attrsStart; i < content.length; i++) {
+      const char = content[i];
+
+      if (quote) {
+        if (char === "\\") {
+          i++;
+        } else if (char === quote) {
+          quote = null;
+        }
+        continue;
+      }
+
+      if (char === '"' || char === "'" || char === "`") {
+        quote = char;
+      } else if (char === "{") {
+        depth++;
+      } else if (char === "}") {
+        depth = Math.max(0, depth - 1);
+      } else if (char === ">" && depth === 0) {
+        end = i;
+        break;
       }
     }
+
+    if (end === -1) {
+      break;
+    }
+
+    tags.push({
+      index: start,
+      attrs: content.slice(attrsStart, end).replace(/\/\s*$/, ""),
+    });
+
+    cursor = end + 1;
+  }
+
+  return tags;
+}
+
+/**
+ * Read a JSX attribute value, ignoring identical identifiers nested inside other
+ * props (e.g. `style={[{ name: "x" }]}`).
+ * Returns the raw value expression, or null when the attribute is absent.
+ */
+function readAttribute(attrs, attrName) {
+  const pattern = new RegExp(`(^|[^A-Za-z0-9_$.])${attrName}\\s*=`, "g");
+  let depth = 0;
+  let quote = null;
+  const topLevel = new Array(attrs.length).fill(false);
+
+  for (let i = 0; i < attrs.length; i++) {
+    const char = attrs[i];
+
+    if (quote) {
+      if (char === "\\") {
+        i++;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+    } else if (char === "{") {
+      depth++;
+    } else if (char === "}") {
+      depth = Math.max(0, depth - 1);
+    } else {
+      topLevel[i] = depth === 0;
+    }
+  }
+
+  let match;
+  while ((match = pattern.exec(attrs)) !== null) {
+    const nameIndex = match.index + match[1].length;
+
+    if (topLevel[nameIndex]) {
+      return attrs.slice(match.index + match[0].length).trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve a JSX attribute value to a literal string, or null when it is dynamic.
+ */
+function staticStringValue(rawValue) {
+  if (!rawValue) {
+    return null;
+  }
+
+  const patterns = [
+    /^["']([^"']*)["']/,
+    /^\{\s*["']([^"']*)["']\s*\}/,
+    /^\{\s*`([^`]*)`\s*\}/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(rawValue);
+
+    if (match && !match[1].includes("${")) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+function isSpreadOnly(attrs) {
+  return /\{\s*\.\.\.[A-Za-z_$]/.test(attrs);
+}
+
+/**
+ * True when the `name` prop is passed straight through (`name={name}` or `{...props}`).
+ * Deliberately narrow: `name={cond ? "a:b" : "c:d"}` is not forwarding, it is an
+ * unresolvable usage and must be reported as one.
+ */
+function forwardsName(attrs, rawValue) {
+  if (rawValue === null) {
+    return isSpreadOnly(attrs);
+  }
+
+  return /^\{\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\}/.test(rawValue);
+}
+
+/**
+ * The attribute value on its own, for reporting: `{cond ? "a:b" : "c:d"}`.
+ */
+function valueExpression(rawValue) {
+  if (rawValue[0] !== "{") {
+    return (/^["'][^"']*["']/.exec(rawValue) || [rawValue])[0];
+  }
+
+  let depth = 0;
+
+  for (let i = 0; i < rawValue.length; i++) {
+    if (rawValue[i] === "{") {
+      depth++;
+    } else if (rawValue[i] === "}") {
+      depth--;
+
+      if (depth === 0) {
+        return rawValue.slice(0, i + 1).replace(/\s+/g, " ");
+      }
+    }
+  }
+
+  return rawValue.split("\n")[0];
+}
+
+/**
+ * Name of the (capitalised) component declaration that encloses `index`.
+ */
+function enclosingComponentName(content, index) {
+  const declaration =
+    /(?:^|[\n;])\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Z][A-Za-z0-9_$]*)|(?:^|[\n;])\s*(?:export\s+)?(?:const|let|var)\s+([A-Z][A-Za-z0-9_$]*)\s*(?::[^=\n]*)?=/g;
+  const before = content.slice(0, index);
+  let owner = null;
+  let match;
+
+  while ((match = declaration.exec(before)) !== null) {
+    owner = match[1] || match[2];
+  }
+
+  return owner;
+}
+
+/**
+ * Local bindings introduced by every `import ... from "source"` statement.
+ */
+function parseImports(content) {
+  // Anchored to the start of a line so the word "import" inside a comment or a
+  // string does not swallow the following statement.
+  const importPattern = /(?:^|[\n;])\s*import\s+([^;'"]*?)\s+from\s+["']([^"']+)["']/g;
+  const imports = [];
+  let match;
+
+  while ((match = importPattern.exec(content)) !== null) {
+    const clause = match[1];
+    const locals = [];
+    const named = /\{([^}]*)\}/.exec(clause);
+
+    if (named) {
+      named[1].split(",").forEach((entry) => {
+        const binding = entry.trim().replace(/^type\s+/, "");
+
+        if (!binding) {
+          return;
+        }
+
+        const aliased = /\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)$/.exec(binding);
+        locals.push(aliased ? aliased[1] : binding.split(/\s+/)[0]);
+      });
+    }
+
+    const namespaced = /\*\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)/.exec(clause);
+
+    if (namespaced) {
+      locals.push(namespaced[1]);
+    }
+
+    const defaultBinding = clause
+      .replace(/\{[^}]*\}/, "")
+      .replace(/^type\s+/, "")
+      .split(",")[0]
+      .trim();
+
+    if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(defaultBinding)) {
+      locals.push(defaultBinding);
+    }
+
+    imports.push({ source: match[2], locals });
+  }
+
+  return imports;
+}
+
+/**
+ * Key used to match an import specifier against the file that declares a wrapper.
+ * Path aliases (`@/components/AppIcon`) and relative paths both reduce to "AppIcon",
+ * so a default import can be renamed at the call site and still be resolved.
+ */
+function moduleKey(specifier) {
+  const segments = specifier
+    .replace(/\.(tsx|ts|jsx|js)$/, "")
+    .split(/[\\/]/)
+    .filter((segment) => segment && segment !== "." && segment !== "..");
+
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const last = segments[segments.length - 1];
+
+  if (last === "index" && segments.length > 1) {
+    return segments[segments.length - 2];
+  }
+
+  return last;
+}
+
+/**
+ * Icon component names usable in a single file: IconifyIcon itself (when imported),
+ * any wrapper declared in the file, and any wrapper imported into it.
+ *
+ * Maps the local binding to the name the wrapper was declared under, so a renamed
+ * default import (`import Glyph from "./AppIcon"`) is still credited to AppIcon.
+ */
+function iconComponentsForFile(file, content, wrappers, extraComponents) {
+  const components = new Map();
+
+  extraComponents.forEach((name) => components.set(name, name));
+
+  if (hasIconifyImport(content)) {
+    CONFIG.componentNames.forEach((name) => components.set(name, name));
+  }
+
+  (wrappers.byFile.get(file) || []).forEach((name) => components.set(name, name));
+
+  parseImports(content).forEach(({ source, locals }) => {
+    const declared = wrappers.namesByModule.get(moduleKey(source));
+
+    locals.forEach((local) => {
+      if (declared) {
+        components.set(local, declared.has(local) ? local : declared.values().next().value);
+      } else if (wrappers.names.has(local)) {
+        components.set(local, local);
+      }
+    });
   });
+
+  return components;
+}
+
+/**
+ * Components in `content` that render an icon component and forward `name` to it.
+ * Returns the wrapper names plus a map of tag index -> wrapper name, so the second
+ * phase can tell a resolved forward apart from an unresolvable usage.
+ */
+function findWrapperComponents(content, iconComponents) {
+  const names = new Set();
+  const forwardingTags = new Map();
+
+  iconComponents.forEach((canonical, component) => {
+    findComponentTags(content, component).forEach((tag) => {
+      if (!forwardsName(tag.attrs, readAttribute(tag.attrs, "name"))) {
+        return;
+      }
+
+      const owner = enclosingComponentName(content, tag.index);
+
+      if (owner) {
+        names.add(owner);
+        forwardingTags.set(tag.index, owner);
+      }
+    });
+  });
+
+  return { names, forwardingTags };
+}
+
+/**
+ * Icon names spelled out in props objects and icon arrays rather than in JSX.
+ * Unchanged heuristics, kept scoped to files that import IconifyIcon directly.
+ */
+function extractIconNamesFromPatterns(content) {
+  const iconNames = new Set();
 
   const spreadPatterns = [
     /IconifyIcon[^}]*name\s*:\s*["']([^"']+)["']/g,
@@ -166,6 +497,68 @@ function extractIconNamesFromComponent(content) {
     }
   });
 
+  return iconNames;
+}
+
+/**
+ * Icon names used through `componentNames` in a single file.
+ *
+ * `unresolved` holds usages whose `name` prop is not a static string.
+ * `forwarded` holds `name={name}` pass-throughs inside a wrapper: they are only
+ * genuinely resolved if the wrapper itself was matched with static names elsewhere,
+ * which is decided once the whole project has been scanned.
+ */
+function extractFromComponents(content, componentNames, forwardingTags) {
+  const iconNames = new Set();
+  const unresolved = [];
+  const forwarded = [];
+  const resolvedBy = new Map();
+  const components =
+    componentNames instanceof Map
+      ? componentNames
+      : new Map(Array.from(componentNames, (name) => [name, name]));
+
+  components.forEach((canonical, component) => {
+    findComponentTags(content, component).forEach((tag) => {
+      const rawValue = readAttribute(tag.attrs, "name");
+
+      if (rawValue === null) {
+        return;
+      }
+
+      const iconName = staticStringValue(rawValue);
+
+      if (iconName) {
+        if (iconName.includes(":")) {
+          iconNames.add(iconName.toLowerCase());
+          resolvedBy.set(canonical, (resolvedBy.get(canonical) || 0) + 1);
+        }
+        return;
+      }
+
+      const usage = {
+        component,
+        wrapper: forwardingTags.get(tag.index) || null,
+        line: content.slice(0, tag.index).split("\n").length,
+        expression: valueExpression(rawValue).slice(0, 60),
+      };
+
+      if (usage.wrapper) {
+        forwarded.push(usage);
+      } else {
+        unresolved.push(usage);
+      }
+    });
+  });
+
+  return { iconNames, unresolved, forwarded, resolvedBy };
+}
+
+function extractIconNamesFromComponent(content, componentNames = CONFIG.componentNames) {
+  const { iconNames } = extractFromComponents(content, componentNames, new Map());
+
+  extractIconNamesFromPatterns(content).forEach((icon) => iconNames.add(icon));
+
   return Array.from(iconNames);
 }
 
@@ -176,48 +569,52 @@ function extractIconNames(content) {
   return extractIconNamesFromComponent(content);
 }
 
-function scanProject(projectRoot = process.cwd()) {
-  const allIcons = new Set();
-  let filesScanned = 0;
-  let filesWithIcons = 0;
-  let filesWithImport = 0;
-
-  console.log("🔍 [Iconify] Scanning for IconifyIcon component usage...\n");
-
-  const scanFile = (file) => {
-    filesScanned++;
-    const content = fs.readFileSync(file, "utf-8");
-
-    if (!hasIconifyImport(content)) {
-      return;
-    }
-
-    filesWithImport++;
-    const icons = extractIconNamesFromComponent(content);
-
-    if (icons.length > 0) {
-      filesWithIcons++;
-      icons.forEach((icon) => allIcons.add(icon));
-
-      const relativePath = path.relative(projectRoot, file);
-      console.log(`   📄 ${relativePath}: ${icons.length} icon(s)`);
-      icons.forEach((icon) => console.log(`      - ${icon}`));
-    }
-  };
+/**
+ * Optional escape hatch for what static analysis cannot reach:
+ *   { "iconify": { "components": ["MyIcon"], "icons": ["mdi:heart"] } }
+ */
+function loadUserConfig(projectRoot) {
+  const config = { components: [], icons: [] };
 
   try {
-    const rootFiles = fs.readdirSync(projectRoot);
-    rootFiles.forEach((file) => {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(projectRoot, "package.json"), "utf-8")
+    );
+    const userConfig = packageJson.iconify;
+
+    if (userConfig && typeof userConfig === "object") {
+      if (Array.isArray(userConfig.components)) {
+        config.components = userConfig.components.filter(
+          (name) => typeof name === "string" && name.length > 0
+        );
+      }
+
+      if (Array.isArray(userConfig.icons)) {
+        config.icons = userConfig.icons.filter(
+          (name) => typeof name === "string" && name.includes(":")
+        );
+      }
+    }
+  } catch (err) {
+    // No package.json or invalid JSON - fall back to static analysis only
+  }
+
+  return config;
+}
+
+function collectProjectFiles(projectRoot) {
+  const files = [];
+
+  try {
+    fs.readdirSync(projectRoot).forEach((file) => {
       const filePath = path.join(projectRoot, file);
-      const stat = fs.statSync(filePath);
 
       if (
-        stat.isFile() &&
-        CONFIG.extensions.some((ext) => file.endsWith(ext))
+        fs.statSync(filePath).isFile() &&
+        CONFIG.extensions.some((ext) => file.endsWith(ext)) &&
+        !shouldIgnore(filePath)
       ) {
-        if (!shouldIgnore(filePath)) {
-          scanFile(filePath);
-        }
+        files.push(filePath);
       }
     });
   } catch (err) {
@@ -227,13 +624,150 @@ function scanProject(projectRoot = process.cwd()) {
   CONFIG.scanDirs.forEach((dir) => {
     const dirPath = path.resolve(projectRoot, dir);
 
-    if (!fs.existsSync(dirPath)) {
+    if (fs.existsSync(dirPath)) {
+      getAllFiles(dirPath).forEach((file) => files.push(file));
+    }
+  });
+
+  return files;
+}
+
+/**
+ * Discover wrapper components, following up to CONFIG.maxWrapperDepth levels of
+ * indirection (a wrapper of a wrapper of IconifyIcon).
+ */
+function discoverWrappers(sources, extraComponents) {
+  const wrappers = {
+    names: new Set(),
+    namesByModule: new Map(),
+    byFile: new Map(),
+    forwardingTags: new Map(),
+  };
+
+  for (let depth = 0; depth < CONFIG.maxWrapperDepth; depth++) {
+    let discovered = 0;
+
+    sources.forEach(({ file, content }) => {
+      const components = iconComponentsForFile(file, content, wrappers, extraComponents);
+
+      if (components.size === 0) {
+        return;
+      }
+
+      const { names, forwardingTags } = findWrapperComponents(content, components);
+      const fileNames = new Set(wrappers.byFile.get(file) || []);
+
+      names.forEach((name) => {
+        if (!wrappers.names.has(name)) {
+          discovered++;
+        }
+
+        wrappers.names.add(name);
+        fileNames.add(name);
+      });
+
+      if (fileNames.size > 0) {
+        wrappers.byFile.set(file, fileNames);
+        wrappers.forwardingTags.set(file, forwardingTags);
+
+        const key = moduleKey(file);
+
+        if (key) {
+          wrappers.namesByModule.set(key, fileNames);
+        }
+      }
+    });
+
+    if (discovered === 0) {
+      break;
+    }
+  }
+
+  return wrappers;
+}
+
+function scanProject(projectRoot = process.cwd()) {
+  const allIcons = new Set();
+  const allUnresolved = [];
+  const allForwarded = [];
+  const resolvedByComponent = new Map();
+  let filesWithIcons = 0;
+  let filesWithImport = 0;
+
+  console.log("🔍 [Iconify] Scanning for IconifyIcon component usage...\n");
+
+  const userConfig = loadUserConfig(projectRoot);
+  const sources = collectProjectFiles(projectRoot).map((file) => ({
+    file,
+    content: fs.readFileSync(file, "utf-8"),
+  }));
+
+  const wrappers = discoverWrappers(sources, userConfig.components);
+
+  userConfig.icons.forEach((icon) => allIcons.add(icon.toLowerCase()));
+
+  sources.forEach(({ file, content }) => {
+    const hasImport = hasIconifyImport(content);
+
+    if (hasImport) {
+      filesWithImport++;
+    }
+
+    const components = iconComponentsForFile(file, content, wrappers, userConfig.components);
+
+    if (components.size === 0) {
       return;
     }
 
-    const files = getAllFiles(dirPath);
-    files.forEach(scanFile);
+    const { iconNames, unresolved, forwarded, resolvedBy } = extractFromComponents(
+      content,
+      components,
+      wrappers.forwardingTags.get(file) || new Map()
+    );
+
+    // Legacy heuristics (icon arrays, `name:` in props objects) stay scoped to files
+    // that import IconifyIcon directly, exactly as before.
+    if (hasImport) {
+      extractIconNamesFromPatterns(content).forEach((icon) => iconNames.add(icon));
+    }
+
+    const relativePath = path.relative(projectRoot, file);
+
+    resolvedBy.forEach((count, component) => {
+      resolvedByComponent.set(
+        component,
+        (resolvedByComponent.get(component) || 0) + count
+      );
+    });
+
+    unresolved.forEach((usage) => {
+      allUnresolved.push({ ...usage, file: relativePath });
+    });
+
+    forwarded.forEach((usage) => {
+      allForwarded.push({ ...usage, file: relativePath });
+    });
+
+    const icons = Array.from(iconNames);
+
+    if (icons.length > 0) {
+      filesWithIcons++;
+      icons.forEach((icon) => allIcons.add(icon));
+
+      console.log(`   📄 ${relativePath}: ${icons.length} icon(s)`);
+      icons.forEach((icon) => console.log(`      - ${icon}`));
+    }
   });
+
+  // A `name={name}` pass-through is only resolved if the wrapper it belongs to was
+  // matched somewhere with a static name. Otherwise the icons behind it are unknown.
+  allForwarded.forEach((usage) => {
+    if (!resolvedByComponent.get(usage.wrapper)) {
+      allUnresolved.push(usage);
+    }
+  });
+
+  allUnresolved.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 
   const byPrefix = {};
   Array.from(allIcons).forEach((icon) => {
@@ -245,10 +779,16 @@ function scanProject(projectRoot = process.cwd()) {
   });
 
   console.log(`\n   📊 Summary:`);
-  console.log(`   - Files scanned: ${filesScanned}`);
+  console.log(`   - Files scanned: ${sources.length}`);
   console.log(`   - Files with IconifyIcon import: ${filesWithImport}`);
   console.log(`   - Files with icons: ${filesWithIcons}`);
   console.log(`   - Total unique icons: ${allIcons.size}\n`);
+
+  if (wrappers.names.size > 0) {
+    console.log(
+      `   Wrapper components traced: ${Array.from(wrappers.names).sort().join(", ")}\n`
+    );
+  }
 
   if (allIcons.size > 0) {
     console.log("   Icons by prefix:");
@@ -260,14 +800,39 @@ function scanProject(projectRoot = process.cwd()) {
     console.log("");
   }
 
+  if (allUnresolved.length > 0) {
+    console.log(
+      `⚠️  [Iconify] ${allUnresolved.length} icon usage(s) could not be resolved statically:`
+    );
+    allUnresolved.slice(0, CONFIG.maxUnresolvedReported).forEach((usage) => {
+      console.log(
+        `   - ${usage.file}:${usage.line} <${usage.component} name=${usage.expression} />`
+      );
+    });
+
+    if (allUnresolved.length > CONFIG.maxUnresolvedReported) {
+      console.log(
+        `   ... and ${allUnresolved.length - CONFIG.maxUnresolvedReported} more`
+      );
+    }
+
+    console.log("");
+    console.log("   These icons are fetched from the Iconify API at runtime instead of");
+    console.log("   being bundled. To bundle them, list them in package.json:");
+    console.log('     { "iconify": { "icons": ["mdi:heart", "mdi:home"] } }\n');
+  }
+
   return {
     icons: Array.from(allIcons).sort(),
     byPrefix,
+    unresolved: allUnresolved,
+    wrapperComponents: Array.from(wrappers.names).sort(),
     stats: {
-      filesScanned,
+      filesScanned: sources.length,
       filesWithImport,
       filesWithIcons,
       totalIcons: allIcons.size,
+      unresolvedUsages: allUnresolved.length,
     },
   };
 }
