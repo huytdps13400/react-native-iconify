@@ -202,27 +202,52 @@ export default function AppIcon({ name, size = 24, ...rest }: AppIconProps) {
 <AppIcon name="mdi:heart" />
 ```
 
+### Literal detection — how icon names are found
+
+Only complete names can be bundled, but they are found in three ways, not one:
+
+1. **Component scan** — `<IconifyIcon name="mdi:home" />` and usages through wrappers.
+2. **Expression literals** — `name={active ? 'mdi:check' : 'mdi:close'}` bundles both
+   branches. A string only counts when its prefix is a real Iconify collection, so an
+   i18n key like `name={t('common:back')}` is never mistaken for an icon.
+3. **Literal scan** (the same strategy Tailwind uses for class names) — any icon-shaped
+   string literal anywhere in the scanned files, e.g. a `constants/icons.ts` map that
+   imports nothing. A candidate must pass three filters before it is bundled: the
+   `prefix:icon-name` shape, a known collection prefix (`scripts/iconify-prefixes.json`,
+   refresh with `node scripts/update-prefixes.js`), and existence — the Iconify API
+   drops names it does not know at fetch time. A false positive costs a few hundred
+   bytes in the bundle; a false negative costs one runtime fetch.
+
 ### Icon names the scanner cannot resolve
 
-Only literal names can be bundled. A name built at runtime — `name={iconName}`,
-`name={active ? 'mdi:check' : 'mdi:close'}` — is reported at the end of the scan with its
-file and line, and is fetched from the Iconify API at runtime instead.
+A name *built* at runtime — `name={iconName}`, ``name={`mdi:${kind}`}`` — cannot be
+resolved by any static scan. It is reported at the end of the scan with its file and
+line, and is fetched from the Iconify API at runtime instead. As with Tailwind class
+names: write complete icon names, or safelist them.
 
-To bundle those icons, list them in your app's `package.json`:
+The safelist lives in your app's `package.json`. Entries containing `*` are globs,
+expanded against the collection's icon list at build time — the right tool for
+``name={`mdi:weather-${condition}`}``:
 
 ```json
 {
   "iconify": {
-    "icons": ["mdi:check", "mdi:close"],
-    "components": ["LegacyIcon"]
+    "icons": ["mdi:check", "mdi:weather-*"],
+    "components": ["LegacyIcon"],
+    "detection": "smart",
+    "extraPrefixes": ["my-custom-set"],
+    "exclude": ["carbon:user"]
   }
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `icons` | Extra icon names to bundle, for names that cannot be resolved statically |
+| `icons` | Extra icon names to bundle. `*` globs are expanded against the collection at build time |
 | `components` | Extra component names to scan, for wrappers the scanner does not reach |
+| `detection` | `"smart"` (default) enables the literal tiers; `"strict"` restricts bundling to the component scan |
+| `extraPrefixes` | Additional collection prefixes to accept, for self-hosted icon sets |
+| `exclude` | Names or glob patterns to keep out of the bundle, e.g. a false positive from the literal scan |
 
 ---
 

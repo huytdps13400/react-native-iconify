@@ -12,8 +12,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { scanProject } = require("./scan-icons");
-const { fetchIcons } = require("./fetch-icons");
+const { scanProject, matchesIconGlob } = require("./scan-icons");
+const { fetchIcons, fetchCollectionIcons } = require("./fetch-icons");
 
 /**
  * Determine output file path
@@ -184,6 +184,45 @@ function getBundledIconNames(outputFile) {
 }
 
 /**
+ * Expand safelist globs ("mdi:weather-*") against each collection's icon list.
+ * A glob whose collection cannot be listed degrades to a warning, never a failure.
+ */
+async function expandIconGlobs(globs) {
+  const expanded = new Set();
+  const byPrefix = new Map();
+
+  globs.forEach((glob) => {
+    const [prefix] = glob.split(":");
+
+    if (!byPrefix.has(prefix)) {
+      byPrefix.set(prefix, []);
+    }
+
+    byPrefix.get(prefix).push(glob);
+  });
+
+  for (const [prefix, patterns] of byPrefix) {
+    try {
+      const names = await fetchCollectionIcons(prefix);
+
+      names.forEach((name) => {
+        const fullName = `${prefix}:${name}`;
+
+        if (patterns.some((pattern) => matchesIconGlob(pattern, fullName))) {
+          expanded.add(fullName);
+        }
+      });
+    } catch (err) {
+      console.warn(
+        `⚠️  [Iconify] Could not expand glob(s) for "${prefix}": ${err.message}`
+      );
+    }
+  }
+
+  return Array.from(expanded);
+}
+
+/**
  * Main bundling function
  */
 async function bundleIcons(options = {}) {
@@ -194,10 +233,23 @@ async function bundleIcons(options = {}) {
   // Step 1: Scan codebase first (to compare with existing bundle)
   const scanResult = scanProject();
 
+  let allIconNames = scanResult.icons;
+
+  if (scanResult.iconGlobs && scanResult.iconGlobs.length > 0) {
+    console.log(
+      `🧩 [Iconify] Expanding ${scanResult.iconGlobs.length} safelist glob(s)...`
+    );
+
+    const expanded = await expandIconGlobs(scanResult.iconGlobs);
+
+    console.log(`   Matched ${expanded.length} icon(s)\n`);
+    allIconNames = Array.from(new Set([...allIconNames, ...expanded])).sort();
+  }
+
   // Check if regeneration is needed
   if (!force && fs.existsSync(outputFile)) {
     const bundledIcons = getBundledIconNames(outputFile);
-    const scannedIcons = scanResult.icons;
+    const scannedIcons = allIconNames;
 
     // Find missing icons (in scanned but not in bundle)
     const missingIcons = scannedIcons.filter(
@@ -228,7 +280,7 @@ async function bundleIcons(options = {}) {
     }
   }
 
-  if (scanResult.icons.length === 0) {
+  if (allIconNames.length === 0) {
     console.log("⚠️  [Iconify] No icons found in codebase");
     console.log("   Creating empty bundle...\n");
 
@@ -246,9 +298,9 @@ async function bundleIcons(options = {}) {
   }
 
   // Step 2: Fetch icon data
-  console.log(`📡 [Iconify] Fetching ${scanResult.icons.length} icons...\n`);
+  console.log(`📡 [Iconify] Fetching ${allIconNames.length} icons...\n`);
 
-  const iconsData = await fetchIcons(scanResult.icons, {
+  const iconsData = await fetchIcons(allIconNames, {
     useCache: true,
     onProgress: ({ current, total, iconName }) => {
       process.stdout.write(
@@ -258,6 +310,34 @@ async function bundleIcons(options = {}) {
   });
 
   process.stdout.write("\r" + " ".repeat(80) + "\r"); // Clear progress line
+
+  // The API is the existence filter for literal-scan candidates: a name it does
+  // not know was a lookalike string, not an icon - dropping it is the fix.
+  const literalScanned = new Set(
+    (scanResult.viaLiteralScan || []).map((entry) => entry.icon)
+  );
+  const missing = allIconNames.filter((name) => !(name in iconsData));
+
+  if (missing.length > 0) {
+    const lookalikes = missing.filter((name) => literalScanned.has(name));
+    const failures = missing.filter((name) => !literalScanned.has(name));
+
+    if (lookalikes.length > 0) {
+      console.log(
+        `   ℹ️  Dropped ${lookalikes.length} literal-scan candidate(s) unknown to the API:`
+      );
+      lookalikes.forEach((name) => console.log(`      - ${name}`));
+    }
+
+    if (failures.length > 0) {
+      console.log(
+        `   ⚠️  ${failures.length} icon(s) could not be fetched and were not bundled:`
+      );
+      failures.forEach((name) => console.log(`      - ${name}`));
+    }
+
+    console.log("");
+  }
 
   // Step 3: Generate bundle file
   console.log("\n📝 [Iconify] Generating bundle file...");

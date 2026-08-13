@@ -248,6 +248,69 @@ async function fetchIcons(iconNames, options = {}) {
 }
 
 /**
+ * Fetch every visible icon name in a collection, for safelist glob expansion
+ * ("mdi:weather-*"). Cached in .iconify-cache/collection-<prefix>.json.
+ */
+async function fetchCollectionIcons(prefix, hostIndex = 0) {
+  const cacheFile = path.join(CACHE_DIR, `collection-${prefix}.json`);
+
+  if (fs.existsSync(cacheFile)) {
+    try {
+      return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    } catch (err) {
+      // Corrupt cache entry - refetch below
+    }
+  }
+
+  const host = API_HOSTS[hostIndex] || API_HOSTS[0];
+  const url = `${host}/collection?prefix=${prefix}`;
+
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+
+      res.on('data', chunk => data += chunk);
+
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const hidden = new Set(json.hidden || []);
+          const names = new Set();
+
+          (json.uncategorized || []).forEach((name) => names.add(name));
+          Object.values(json.categories || {}).forEach((list) =>
+            list.forEach((name) => names.add(name))
+          );
+          Object.keys(json.aliases || {}).forEach((name) => names.add(name));
+
+          const result = Array.from(names).filter((name) => !hidden.has(name));
+
+          if (result.length === 0) {
+            throw new Error(`no icons returned`);
+          }
+
+          ensureCacheDir();
+          fs.writeFileSync(cacheFile, JSON.stringify(result));
+          resolve(result);
+        } catch (err) {
+          if (hostIndex < API_HOSTS.length - 1) {
+            fetchCollectionIcons(prefix, hostIndex + 1).then(resolve).catch(reject);
+          } else {
+            reject(new Error(`Failed to list collection "${prefix}": ${err.message}`));
+          }
+        }
+      });
+    }).on('error', (err) => {
+      if (hostIndex < API_HOSTS.length - 1) {
+        fetchCollectionIcons(prefix, hostIndex + 1).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
  * Clear cache
  */
 function clearCache() {
@@ -261,6 +324,7 @@ function clearCache() {
 module.exports = {
   fetchIcons,
   fetchFromAPI,
+  fetchCollectionIcons,
   getFromCache,
   clearCache,
   CACHE_DIR,
