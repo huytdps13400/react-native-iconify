@@ -1,0 +1,11 @@
+{
+  "name": "dynamic-app-fixture",
+  "private": true,
+  "version": "1.0.0",
+  "iconify": {
+    "components": ["LegacyIcon"],
+    "icons": ["mdi:alert", "mdi:weather-*"],
+    "extraPrefixes": ["acme"],
+    "exclude": ["mdi:home-variant"]
+  }
+}
