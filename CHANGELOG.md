@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-14
+
+### Added
+
+- **Wrapper component tracing** - the production scan now detects icons used through
+  your own wrapper components (`<AppIcon name="mdi:heart" />`), up to three levels of
+  indirection, including renamed default imports and barrel re-exports (#7, #8)
+- **Prefix-validated literal detection** (Tailwind-style) - icon-shaped string literals
+  anywhere in the scanned files are bundled when their prefix is a known Iconify
+  collection (`scripts/iconify-prefixes.json`, 236 sets); the Iconify API acts as the
+  final existence filter at fetch time (#8)
+- **Expression literal scraping** - `name={active ? "mdi:check" : "mdi:close"}` bundles
+  both branches; i18n keys like `name={t("common:back")}` are never mistaken for icons
+- **Safelist globs** - `"iconify": { "icons": ["mdi:weather-*"] }` expands against the
+  collection's icon list at build time, for dynamically constructed names
+- **New `iconify` config fields** in package.json: `detection` (`"smart"` / `"strict"`),
+  `extraPrefixes` (self-hosted icon sets), `exclude` (names or glob patterns)
+- Dynamic icon name constructions (`` name={`mdi:${kind}`} ``) and statically
+  unresolvable usages are reported with file and line instead of silently dropped
+
+### Fixed
+
+- Files using icons only through wrappers were skipped entirely by the import gate,
+  producing an empty production bundle (#7)
+- `name` prop no longer missed when preceded by props containing `>` (arrow functions)
+- `<IconifyIconGroup />` no longer falsely matched as `<IconifyIcon />`
+
+## [1.1.0] - 2026-08-11
+
+### Added
+
+- React Native Web and Expo Web support with a platform-specific in-memory LRU cache;
+  persistent native caches on iOS and Android retained (#2, #5)
+- Node regression coverage and production-bundle Chromium E2E tests on GitHub Actions
+
+### Fixed
+
+- Icon rendering when an Iconify API response omits `width`/`height` - Iconify's
+  default dimensions are applied (#3, #4)
+
 ## [1.0.9] - 2026-01-19
 
 ### Fixed
